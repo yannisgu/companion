@@ -1,47 +1,92 @@
-import { createHash, randomBytes } from 'crypto'
 import { nanoid } from 'nanoid'
 import type { ApiToken, ApiTokenScope, ApiTokenStore } from './RestApiAuth.js'
 import LogController from '../../Log/Controller.js'
 
-const TOKEN_PREFIX = 'cpn_'
+/**
+ * Static development tokens for easy testing.
+ * These are always available when the REST API is enabled.
+ */
+const STATIC_DEV_TOKENS: ApiToken[] = [
+	{
+		id: 'static-read',
+		name: 'Dev Read Token',
+		token: 'cpn_read',
+		scopes: ['read'],
+		createdAt: 0,
+		lastUsedAt: null,
+	},
+	{
+		id: 'static-write',
+		name: 'Dev Write Token',
+		token: 'cpn_write',
+		scopes: ['read', 'write'],
+		createdAt: 0,
+		lastUsedAt: null,
+	},
+	{
+		id: 'static-execute',
+		name: 'Dev Execute Token',
+		token: 'cpn_execute',
+		scopes: ['read', 'execute'],
+		createdAt: 0,
+		lastUsedAt: null,
+	},
+	{
+		id: 'static-admin',
+		name: 'Dev Admin Token',
+		token: 'cpn_admin',
+		scopes: ['admin'],
+		createdAt: 0,
+		lastUsedAt: null,
+	},
+]
 
 /**
  * In-memory token store for the REST API prototype.
- * In production this would be backed by SQLite (api_tokens table).
+ * Includes static dev tokens (cpn_read, cpn_write, cpn_execute, cpn_admin)
+ * for easy testing without needing a token management endpoint.
  */
 export class RestApiTokenStoreMemory implements ApiTokenStore {
 	readonly #logger = LogController.createLogger('Service/RestApi/TokenStore')
-	readonly #tokens: Map<string, ApiToken> = new Map() // keyed by token hash
+	readonly #tokens: Map<string, ApiToken> = new Map() // keyed by plaintext token
+
+	constructor() {
+		// Register static dev tokens
+		for (const token of STATIC_DEV_TOKENS) {
+			this.#tokens.set(token.token, token)
+		}
+		this.#logger.info(
+			`Token store initialized with ${STATIC_DEV_TOKENS.length} static dev tokens: ${STATIC_DEV_TOKENS.map((t) => t.token).join(', ')}`
+		)
+	}
 
 	/**
-	 * Create a new API token. Returns the plaintext token (shown only once).
+	 * Create a new API token. Returns the token object with its plaintext value.
 	 */
 	createToken(name: string, scopes: ApiTokenScope[]): { token: ApiToken; plaintext: string } {
 		const id = nanoid()
-		const rawBytes = randomBytes(32).toString('hex')
-		const plaintext = `${TOKEN_PREFIX}${rawBytes}`
-		const tokenHash = createHash('sha256').update(plaintext).digest('hex')
+		const plaintext = `cpn_${id}`
 
 		const token: ApiToken = {
 			id,
 			name,
-			tokenHash,
+			token: plaintext,
 			scopes,
 			createdAt: Date.now(),
 			lastUsedAt: null,
 		}
 
-		this.#tokens.set(tokenHash, token)
+		this.#tokens.set(plaintext, token)
 		this.#logger.info(`Created API token "${name}" (id=${id})`)
 
 		return { token, plaintext }
 	}
 
 	/**
-	 * Find a token by its SHA-256 hash.
+	 * Find a token by its plaintext value.
 	 */
-	findByHash(hash: string): ApiToken | undefined {
-		return this.#tokens.get(hash)
+	findByToken(plaintext: string): ApiToken | undefined {
+		return this.#tokens.get(plaintext)
 	}
 
 	/**
@@ -57,19 +102,19 @@ export class RestApiTokenStoreMemory implements ApiTokenStore {
 	}
 
 	/**
-	 * List all tokens (without hashes).
+	 * List all tokens.
 	 */
-	listTokens(): Omit<ApiToken, 'tokenHash'>[] {
-		return Array.from(this.#tokens.values()).map(({ tokenHash: _hash, ...rest }) => rest)
+	listTokens(): ApiToken[] {
+		return Array.from(this.#tokens.values())
 	}
 
 	/**
 	 * Delete a token by ID.
 	 */
 	deleteToken(tokenId: string): boolean {
-		for (const [hash, token] of this.#tokens.entries()) {
+		for (const [key, token] of this.#tokens.entries()) {
 			if (token.id === tokenId) {
-				this.#tokens.delete(hash)
+				this.#tokens.delete(key)
 				this.#logger.info(`Deleted API token "${token.name}" (id=${tokenId})`)
 				return true
 			}

@@ -1,5 +1,4 @@
 import type Express from 'express'
-import { createHash } from 'crypto'
 import { RestApiError } from './errors.js'
 import type { Logger } from '../../Log/Controller.js'
 
@@ -8,7 +7,7 @@ export type ApiTokenScope = 'read' | 'write' | 'execute' | 'admin'
 export interface ApiToken {
 	id: string
 	name: string
-	tokenHash: string
+	token: string
 	scopes: ApiTokenScope[]
 	createdAt: number
 	lastUsedAt: number | null
@@ -30,14 +29,13 @@ function hasScope(tokenScopes: ApiTokenScope[], required: RequiredScope): boolea
 }
 
 export interface ApiTokenStore {
-	findByHash(hash: string): ApiToken | undefined
+	findByToken(plaintext: string): ApiToken | undefined
 	updateLastUsed(tokenId: string): void
 }
 
 /**
  * Create Bearer token authentication middleware.
- * Extracts token from Authorization header, looks up by SHA-256 hash,
- * and attaches the token to the request.
+ * Extracts token from Authorization header and looks up by plaintext value.
  */
 export function createAuthMiddleware(logger: Logger, tokenStore: ApiTokenStore) {
 	return (req: Express.Request, _res: Express.Response, next: Express.NextFunction): void => {
@@ -48,9 +46,7 @@ export function createAuthMiddleware(logger: Logger, tokenStore: ApiTokenStore) 
 		}
 
 		const plainToken = authHeader.slice(7)
-		const hash = createHash('sha256').update(plainToken).digest('hex')
-
-		const token = tokenStore.findByHash(hash)
+		const token = tokenStore.findByToken(plainToken)
 		if (!token) {
 			next(RestApiError.unauthorized('Invalid API token'))
 			return

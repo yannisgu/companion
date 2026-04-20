@@ -29,9 +29,9 @@ describe('REST API v1 — Connections', () => {
 
 		const tokenStore = new RestApiTokenStoreMemory()
 
-		// Create a token for tests
-		const { plaintext: validToken } = tokenStore.createToken('test-token', ['read', 'write', 'execute', 'admin'])
-		const { plaintext: readOnlyToken } = tokenStore.createToken('read-only', ['read'])
+		// Use the static dev tokens for testing
+		const validToken = 'cpn_admin'
+		const readOnlyToken = 'cpn_read'
 
 		const restApiRouter = createRestApiRouter(instanceController, userconfig, tokenStore)
 
@@ -151,8 +151,6 @@ describe('REST API v1 — Connections', () => {
 			})
 
 			const tokenStore = new RestApiTokenStoreMemory()
-			const { plaintext: token } = tokenStore.createToken('test', ['admin'])
-
 			const restApiRouter = createRestApiRouter(instanceController, userconfig, tokenStore)
 			const app = express()
 			app.use(Express.json())
@@ -160,7 +158,7 @@ describe('REST API v1 — Connections', () => {
 
 			const res = await supertest(app)
 				.get('/api/v1/connections')
-				.set('Authorization', `Bearer ${token}`)
+				.set('Authorization', 'Bearer cpn_admin')
 				.send()
 			expect(res.status).toBe(403)
 			expect(res.body.error.code).toBe('API_DISABLED')
