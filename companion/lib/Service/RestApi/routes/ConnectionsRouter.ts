@@ -17,7 +17,7 @@ import {
 } from '../schemas/connections.js'
 import { registry } from '../registry.js'
 import type { InstanceController } from '../../../Instance/Controller.js'
-import { InstanceVersionUpdatePolicy } from '@companion-app/shared/Model/Instance.js'
+import { InstanceVersionUpdatePolicy, ModuleInstanceType } from '@companion-app/shared/Model/Instance.js'
 import type { Logger } from '../../../Log/Controller.js'
 
 /**
@@ -51,6 +51,12 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 		}
 
 		const { module, label, versionId, enabled } = parsed.data
+
+		// Validate the module exists before attempting to create
+		if (!instanceController.modules.hasModule(ModuleInstanceType.Connection, module.type)) {
+			next(RestApiError.badRequest(`Unknown module type: "${module.type}"`))
+			return
+		}
 
 		try {
 			const [id] = instanceController.addConnectionWithLabel(module, label, {

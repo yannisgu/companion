@@ -275,6 +275,7 @@ describe('REST API v1 — Connections', () => {
 				updatePolicy: InstanceVersionUpdatePolicy.Stable,
 			}
 
+			instanceController.modules.hasModule.mockReturnValue(true)
 			instanceController.addConnectionWithLabel.mockReturnValue(['new-id', newConfig])
 			instanceController.getConnectionClientJson.mockReturnValue({
 				'new-id': {
@@ -332,12 +333,10 @@ describe('REST API v1 — Connections', () => {
 			expect(res.body.error.code).toBe('BAD_REQUEST')
 		})
 
-		test('returns 400 when addConnectionWithLabel throws', async () => {
+		test('returns 400 for unknown module type', async () => {
 			const { app, instanceController, validToken } = createService()
 
-			instanceController.addConnectionWithLabel.mockImplementation(() => {
-				throw new Error('Module not found')
-			})
+			instanceController.modules.hasModule.mockReturnValue(false)
 
 			const res = await supertest(app)
 				.post('/api/connections/v1')
@@ -348,7 +347,29 @@ describe('REST API v1 — Connections', () => {
 				})
 
 			expect(res.status).toBe(400)
-			expect(res.body.error.message).toBe('Module not found')
+			expect(res.body.error.code).toBe('BAD_REQUEST')
+			expect(res.body.error.message).toContain('nonexistent')
+			expect(instanceController.addConnectionWithLabel).not.toHaveBeenCalled()
+		})
+
+		test('returns 400 when addConnectionWithLabel throws', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.modules.hasModule.mockReturnValue(true)
+			instanceController.addConnectionWithLabel.mockImplementation(() => {
+				throw new Error('Label already in use')
+			})
+
+			const res = await supertest(app)
+				.post('/api/connections/v1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({
+					module: { type: 'obs-websocket' },
+					label: 'test',
+				})
+
+			expect(res.status).toBe(400)
+			expect(res.body.error.message).toBe('Label already in use')
 		})
 	})
 
