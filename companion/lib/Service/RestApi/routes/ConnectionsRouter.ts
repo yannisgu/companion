@@ -5,7 +5,7 @@ import { successResponse, collectionResponse } from '../schemas/common.js'
 import {
 	ConnectionCreateBodySchema,
 	ConnectionPatchBodySchema,
-	type ConnectionResponse,
+	buildConnectionResponse,
 } from '../schemas/connections.js'
 import type { InstanceController } from '../../../Instance/Controller.js'
 import { InstanceVersionUpdatePolicy } from '@companion-app/shared/Model/Instance.js'
@@ -23,19 +23,9 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	router.get('/', requireScope('read'), (_req, res) => {
 		const clientConnections = instanceController.getConnectionClientJson(true)
 
-		const connections: ConnectionResponse[] = Object.entries(clientConnections).map(([id, config]) => {
+		const connections = Object.entries(clientConnections).map(([id, config]) => {
 			const status = instanceController.getInstanceStatus(id)
-			return {
-				id,
-				label: config.label,
-				moduleId: config.moduleId,
-				moduleVersionId: config.moduleVersionId,
-				updatePolicy: config.updatePolicy,
-				enabled: config.enabled,
-				sortOrder: config.sortOrder,
-				collectionId: config.collectionId,
-				status: status ?? null,
-			}
+			return buildConnectionResponse(id, config, status)
 		})
 
 		res.json(collectionResponse(connections, { total: connections.length, limit: connections.length, offset: 0 }))
@@ -54,25 +44,17 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 		const { module, label, versionId, enabled } = parsed.data
 
 		try {
-			const [id, config] = instanceController.addConnectionWithLabel(module, label, {
+			const [id] = instanceController.addConnectionWithLabel(module, label, {
 				versionId: versionId ?? null,
 				updatePolicy: InstanceVersionUpdatePolicy.Stable,
 				disabled: enabled === false,
 			})
 
+			// Re-fetch from client JSON so response goes through the same path as GET
+			const clientConnections = instanceController.getConnectionClientJson(false)
+			const config = clientConnections[id]
 			const status = instanceController.getInstanceStatus(id)
-
-			const response: ConnectionResponse = {
-				id,
-				label: config.label,
-				moduleId: config.moduleId,
-				moduleVersionId: config.moduleVersionId,
-				updatePolicy: config.updatePolicy,
-				enabled: config.enabled,
-				sortOrder: config.sortOrder,
-				collectionId: config.collectionId ?? null,
-				status: status ?? null,
-			}
+			const response = buildConnectionResponse(id, config, status)
 
 			logger.info(`REST API: Created connection "${label}" (${id})`)
 			res.status(201).location(`/api/v1/connections/${id}`).json(successResponse(response))
@@ -95,20 +77,7 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 		}
 
 		const status = instanceController.getInstanceStatus(connectionId)
-
-		const response: ConnectionResponse = {
-			id: connectionId,
-			label: config.label,
-			moduleId: config.moduleId,
-			moduleVersionId: config.moduleVersionId,
-			updatePolicy: config.updatePolicy,
-			enabled: config.enabled,
-			sortOrder: config.sortOrder,
-			collectionId: config.collectionId,
-			status: status ?? null,
-		}
-
-		res.json(successResponse(response))
+		res.json(successResponse(buildConnectionResponse(connectionId, config, status)))
 	})
 
 	/**
@@ -149,18 +118,7 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 		const updatedConnections = instanceController.getConnectionClientJson(false)
 		const updatedConfig = updatedConnections[connectionId]
 		const status = instanceController.getInstanceStatus(connectionId)
-
-		const response: ConnectionResponse = {
-			id: connectionId,
-			label: updatedConfig.label,
-			moduleId: updatedConfig.moduleId,
-			moduleVersionId: updatedConfig.moduleVersionId,
-			updatePolicy: updatedConfig.updatePolicy,
-			enabled: updatedConfig.enabled,
-			sortOrder: updatedConfig.sortOrder,
-			collectionId: updatedConfig.collectionId,
-			status: status ?? null,
-		}
+		const response = buildConnectionResponse(connectionId, updatedConfig, status)
 
 		logger.info(`REST API: Updated connection "${response.label}" (${connectionId})`)
 		res.json(successResponse(response))
