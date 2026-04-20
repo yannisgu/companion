@@ -1,12 +1,21 @@
 import Express from 'express'
+import z from 'zod'
 import { requireScope } from '../RestApiAuth.js'
 import { RestApiError } from '../errors.js'
-import { successResponse, collectionResponse } from '../schemas/common.js'
 import {
+	successResponse,
+	collectionResponse,
+	createSuccessSchema,
+	createCollectionSchema,
+	ErrorResponseSchema,
+} from '../schemas/common.js'
+import {
+	ConnectionResponseSchema,
 	ConnectionCreateBodySchema,
 	ConnectionPatchBodySchema,
 	buildConnectionResponse,
 } from '../schemas/connections.js'
+import { registry } from '../registry.js'
 import type { InstanceController } from '../../../Instance/Controller.js'
 import { InstanceVersionUpdatePolicy } from '@companion-app/shared/Model/Instance.js'
 import type { Logger } from '../../../Log/Controller.js'
@@ -165,4 +174,130 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	})
 
 	return router
+}
+
+const connectionIdParam = z.object({ connectionId: z.string() })
+
+const errorResponses = {
+	400: { description: 'Bad request', content: { 'application/json': { schema: ErrorResponseSchema } } },
+	401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+	403: { description: 'Forbidden', content: { 'application/json': { schema: ErrorResponseSchema } } },
+	404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+}
+
+/**
+ * Register all /connections paths in the OpenAPI registry.
+ * Called once at startup before the spec is generated.
+ */
+export function registerConnectionPaths(): void {
+	registry.registerPath({
+		method: 'get',
+		path: '/connections',
+		tags: ['Connections'],
+		summary: 'List all connections',
+		description: 'Returns all connections with their configuration and current status.',
+		security: [{ bearerAuth: [] }],
+		responses: {
+			200: {
+				description: 'List of connections',
+				content: { 'application/json': { schema: createCollectionSchema(ConnectionResponseSchema) } },
+			},
+			...errorResponses,
+		},
+	})
+
+	registry.registerPath({
+		method: 'post',
+		path: '/connections',
+		tags: ['Connections'],
+		summary: 'Create a connection',
+		description: 'Create a new connection instance for a given module type.',
+		security: [{ bearerAuth: [] }],
+		request: {
+			body: { content: { 'application/json': { schema: ConnectionCreateBodySchema } }, required: true },
+		},
+		responses: {
+			201: {
+				description: 'Connection created',
+				content: { 'application/json': { schema: createSuccessSchema(ConnectionResponseSchema) } },
+			},
+			...errorResponses,
+		},
+	})
+
+	registry.registerPath({
+		method: 'get',
+		path: '/connections/{connectionId}',
+		tags: ['Connections'],
+		summary: 'Get a connection',
+		description: 'Returns a single connection by ID with its configuration and current status.',
+		security: [{ bearerAuth: [] }],
+		request: { params: connectionIdParam },
+		responses: {
+			200: {
+				description: 'Connection details',
+				content: { 'application/json': { schema: createSuccessSchema(ConnectionResponseSchema) } },
+			},
+			...errorResponses,
+		},
+	})
+
+	registry.registerPath({
+		method: 'patch',
+		path: '/connections/{connectionId}',
+		tags: ['Connections'],
+		summary: 'Update a connection',
+		description: 'Partially update a connection. Only send the fields you want to change.',
+		security: [{ bearerAuth: [] }],
+		request: {
+			params: connectionIdParam,
+			body: { content: { 'application/json': { schema: ConnectionPatchBodySchema } }, required: true },
+		},
+		responses: {
+			200: {
+				description: 'Updated connection',
+				content: { 'application/json': { schema: createSuccessSchema(ConnectionResponseSchema) } },
+			},
+			...errorResponses,
+		},
+	})
+
+	registry.registerPath({
+		method: 'delete',
+		path: '/connections/{connectionId}',
+		tags: ['Connections'],
+		summary: 'Delete a connection',
+		description: 'Delete a connection and all its associated configuration.',
+		security: [{ bearerAuth: [] }],
+		request: { params: connectionIdParam },
+		responses: {
+			204: { description: 'Connection deleted' },
+			...errorResponses,
+		},
+	})
+
+	registry.registerPath({
+		method: 'post',
+		path: '/connections/{connectionId}/restart',
+		tags: ['Connections'],
+		summary: 'Restart a connection',
+		description: 'Force-restart the connection process. Fails if the connection is disabled.',
+		security: [{ bearerAuth: [] }],
+		request: { params: connectionIdParam },
+		responses: {
+			200: {
+				description: 'Restart triggered',
+				content: {
+					'application/json': {
+						schema: createSuccessSchema(z.object({ id: z.string(), message: z.string() })),
+					},
+				},
+			},
+			409: {
+				description: 'Connection is inactive',
+				content: { 'application/json': { schema: ErrorResponseSchema } },
+			},
+			...errorResponses,
+		},
+	})
 }

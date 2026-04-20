@@ -7,6 +7,30 @@ export const PaginationMetaSchema = z.object({
 	offset: z.number(),
 })
 
+/** Error body schema for OpenAPI docs */
+export const ErrorResponseSchema = z.object({
+	error: z.object({
+		code: z.string(),
+		message: z.string(),
+		details: z.unknown().optional(),
+	}),
+})
+
+/** Create a typed single-item success envelope schema for OpenAPI docs */
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export function createSuccessSchema<T extends z.ZodType>(itemSchema: T) {
+	return z.object({ data: itemSchema })
+}
+
+/** Create a typed collection envelope schema for OpenAPI docs */
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export function createCollectionSchema<T extends z.ZodType>(itemSchema: T) {
+	return z.object({
+		data: z.array(itemSchema),
+		meta: PaginationMetaSchema,
+	})
+}
+
 /** Single-item success response */
 export function successResponse<T>(data: T): { data: T } {
 	return { data }

@@ -1,7 +1,9 @@
 import Express from 'express'
+import swaggerUi from 'swagger-ui-express'
 import { createAuthMiddleware, type ApiTokenStore } from './RestApiAuth.js'
 import { restApiErrorHandler } from './middleware/errorHandler.js'
 import { createConnectionsRouter } from './routes/ConnectionsRouter.js'
+import { generateOpenApiDocument } from './openapi.js'
 import type { InstanceController } from '../../Instance/Controller.js'
 import type { DataUserConfig } from '../../Data/UserConfig.js'
 import LogController from '../../Log/Controller.js'
@@ -32,7 +34,16 @@ export function createRestApiRouter(
 		}
 	})
 
-	// Bearer token authentication
+	// OpenAPI spec and Swagger UI — served without auth
+	const openApiDocument = generateOpenApiDocument()
+
+	router.get('/openapi.json', (_req, res) => {
+		res.json(openApiDocument)
+	})
+
+	router.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument))
+
+	// Bearer token authentication (all routes below require a token)
 	router.use(createAuthMiddleware(logger, tokenStore))
 
 	// Mount sub-routers
