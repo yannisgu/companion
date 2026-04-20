@@ -24,7 +24,7 @@ describe('OpenAPI Spec Generation', () => {
 	test('generates a valid OpenAPI 3.0.3 document', () => {
 		expect(doc.openapi).toBe('3.0.3')
 		expect(doc.info.title).toBe('Bitfocus Companion REST API')
-		expect(doc.info.version).toBe('1.0.0')
+		expect(doc.info.version).toBe('4.3.0')
 	})
 
 	test('includes server definition', () => {

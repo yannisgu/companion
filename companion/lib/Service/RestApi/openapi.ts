@@ -1,6 +1,10 @@
+import { createRequire } from 'module'
 import { OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi'
 import { registry } from './registry.js'
 import { registerConnectionPaths } from './routes/ConnectionsRouter.js'
+
+const require = createRequire(import.meta.url)
+const { version } = require('../../../package.json') as { version: string }
 
 /**
  * Generate the OpenAPI 3.0 JSON document from the registry.
@@ -16,7 +20,7 @@ export function generateOpenApiDocument(): ReturnType<OpenApiGeneratorV3['genera
 		openapi: '3.0.3',
 		info: {
 			title: 'Bitfocus Companion REST API',
-			version: '1.0.0',
+			version,
 			description: 'REST API for programmatic configuration management of Bitfocus Companion.',
 		},
 		servers: [{ url: '/api', description: 'REST API (resources versioned independently)' }],
