@@ -425,7 +425,7 @@ describe('REST API v1 — Connections', () => {
 					updatePolicy: null,
 					upgradeIndex: null,
 				},
-				{ patchSecrets: true }
+				{ patchConfig: true, patchSecrets: true }
 			)
 		})
 
@@ -489,6 +489,153 @@ describe('REST API v1 — Connections', () => {
 
 			expect(res.status).toBe(400)
 			expect(res.body.error.code).toBe('BAD_REQUEST')
+		})
+
+		test('validates config keys against module field definitions', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
+
+			const mockInstance = {
+				requestConfigFields: async () => [
+					{ id: 'host', type: 'textinput' as const, label: 'Host', default: '' },
+					{ id: 'port', type: 'number' as const, label: 'Port', default: 4455, min: 1, max: 65535 },
+					{ id: 'password', type: 'secret-text' as const, label: 'Password' },
+				],
+			}
+			instanceController.processManager.getConnectionChild.mockReturnValue(mockInstance as any)
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({ config: { host: 'localhost', port: 99999 } })
+
+			expect(res.status).toBe(400)
+			expect(res.body.error.code).toBe('BAD_REQUEST')
+			expect(res.body.error.details['config.port']).toBeDefined()
+		})
+
+		test('rejects config field that should be in secrets', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
+
+			const mockInstance = {
+				requestConfigFields: async () => [
+					{ id: 'host', type: 'textinput' as const, label: 'Host', default: '' },
+					{ id: 'password', type: 'secret-text' as const, label: 'Password' },
+				],
+			}
+			instanceController.processManager.getConnectionChild.mockReturnValue(mockInstance as any)
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({ config: { password: 'secret123' } })
+
+			expect(res.status).toBe(400)
+			expect(res.body.error.details['config.password']).toContain('secret')
+		})
+
+		test('rejects secrets field that should be in config', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
+
+			const mockInstance = {
+				requestConfigFields: async () => [
+					{ id: 'host', type: 'textinput' as const, label: 'Host', default: '' },
+					{ id: 'password', type: 'secret-text' as const, label: 'Password' },
+				],
+			}
+			instanceController.processManager.getConnectionChild.mockReturnValue(mockInstance as any)
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({ secrets: { host: 'localhost' } })
+
+			expect(res.status).toBe(400)
+			expect(res.body.error.details['secrets.host']).toContain('not a secret')
+		})
+
+		test('rejects unknown config keys', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
+
+			const mockInstance = {
+				requestConfigFields: async () => [
+					{ id: 'host', type: 'textinput' as const, label: 'Host', default: '' },
+				],
+			}
+			instanceController.processManager.getConnectionChild.mockReturnValue(mockInstance as any)
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({ config: { nonexistent: 'value' } })
+
+			expect(res.status).toBe(400)
+			expect(res.body.error.details['config.nonexistent']).toContain('Unknown')
+		})
+
+		test('passes valid config through to setConnectionLabelAndConfig', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
+
+			const mockInstance = {
+				requestConfigFields: async () => [
+					{ id: 'host', type: 'textinput' as const, label: 'Host', default: '' },
+					{ id: 'port', type: 'number' as const, label: 'Port', default: 4455, min: 1, max: 65535 },
+					{ id: 'password', type: 'secret-text' as const, label: 'Password' },
+				],
+			}
+			instanceController.processManager.getConnectionChild.mockReturnValue(mockInstance as any)
+			instanceController.setConnectionLabelAndConfig.mockReturnValue({ ok: true })
+
+			const updatedConfigs = createConnectionConfigs()
+			instanceController.getConnectionClientJson.mockReturnValueOnce(updatedConfigs)
+			instanceController.getInstanceStatus.mockReturnValue(mockStatus)
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({ config: { host: 'localhost', port: 4455 }, secrets: { password: 'abc' } })
+
+			expect(res.status).toBe(200)
+			expect(instanceController.setConnectionLabelAndConfig).toHaveBeenCalledWith(
+				'conn-1',
+				{
+					label: null,
+					enabled: null,
+					config: { host: 'localhost', port: 4455 },
+					secrets: { password: 'abc' },
+					updatePolicy: null,
+					upgradeIndex: null,
+				},
+				{ patchConfig: true, patchSecrets: true }
+			)
+		})
+
+		test('skips validation when connection is not running', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
+			instanceController.processManager.getConnectionChild.mockReturnValue(null as any)
+			instanceController.setConnectionLabelAndConfig.mockReturnValue({ ok: true })
+
+			const updatedConfigs = createConnectionConfigs()
+			instanceController.getConnectionClientJson.mockReturnValueOnce(updatedConfigs)
+			instanceController.getInstanceStatus.mockReturnValue(mockStatus)
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({ config: { anything: 'goes' } })
+
+			expect(res.status).toBe(200)
 		})
 	})
 

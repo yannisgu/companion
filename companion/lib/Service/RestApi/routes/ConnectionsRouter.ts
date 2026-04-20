@@ -19,6 +19,8 @@ import { registry } from '../registry.js'
 import type { InstanceController } from '../../../Instance/Controller.js'
 import { InstanceVersionUpdatePolicy, ModuleInstanceType } from '@companion-app/shared/Model/Instance.js'
 import type { Logger } from '../../../Log/Controller.js'
+import { validateInputValue } from '@companion-app/shared/ValidateInputValue.js'
+import type { SomeCompanionInputField } from '@companion-app/shared/Model/Options.js'
 
 /**
  * Create the connections router for /api/connections/v1
@@ -111,7 +113,7 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	/**
 	 * PATCH /connections/:connectionId — Partial update (merge fields)
 	 */
-	router.patch('/:connectionId', requireScope('write'), (req, res, next) => {
+	router.patch('/:connectionId', requireScope('write'), async (req, res, next) => {
 		const { connectionId } = req.params
 
 		const clientConnections = instanceController.getConnectionClientJson(true)
@@ -128,11 +130,13 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 
 		const { label, enabled, config, secrets, updatePolicy } = parsed.data
 
-		// Merge config with existing (partial update semantics)
-		let mergedConfig: unknown | null = null
-		if (config) {
-			const existing = instanceController.getInstanceConfigOfType(connectionId, ModuleInstanceType.Connection)
-			mergedConfig = { ...((existing?.config as Record<string, unknown>) ?? {}), ...config }
+		// Validate config/secrets values against module field definitions
+		if (config || secrets) {
+			const validationErrors = await validateConfigAndSecrets(instanceController, connectionId, config, secrets)
+			if (validationErrors) {
+				next(RestApiError.badRequest('Config validation failed', validationErrors))
+				return
+			}
 		}
 
 		const result = instanceController.setConnectionLabelAndConfig(
@@ -140,12 +144,12 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 			{
 				label: label ?? null,
 				enabled: enabled ?? null,
-				config: mergedConfig,
+				config: config ?? null,
 				secrets: secrets ?? null,
 				updatePolicy: updatePolicy ?? null,
 				upgradeIndex: null,
 			},
-			{ patchSecrets: true }
+			{ patchConfig: true, patchSecrets: true }
 		)
 
 		if (!result.ok) {
@@ -204,6 +208,79 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	})
 
 	return router
+}
+
+/**
+ * Validate config and secrets values against the module's field definitions.
+ * Returns an object with field errors if validation fails, or null if valid.
+ */
+async function validateConfigAndSecrets(
+	instanceController: InstanceController,
+	connectionId: string,
+	config: Record<string, unknown> | undefined,
+	secrets: Record<string, unknown> | undefined
+): Promise<Record<string, string> | null> {
+	const instance = instanceController.processManager.getConnectionChild(connectionId)
+	if (!instance) {
+		// Connection not running, skip field-level validation
+		return null
+	}
+
+	let fields: SomeCompanionInputField[]
+	try {
+		fields = await instance.requestConfigFields()
+	} catch {
+		// Cannot retrieve fields (e.g. module crashed), skip validation
+		return null
+	}
+
+	const errors: Record<string, string> = {}
+
+	// Build a lookup of field definitions by id
+	const fieldMap = new Map<string, SomeCompanionInputField>()
+	for (const field of fields) {
+		fieldMap.set(field.id, field)
+	}
+
+	// Validate config keys against non-secret fields
+	if (config) {
+		for (const [key, value] of Object.entries(config)) {
+			const field = fieldMap.get(key)
+			if (!field) {
+				errors[`config.${key}`] = `Unknown config field: "${key}"`
+				continue
+			}
+			if (field.type === 'secret-text') {
+				errors[`config.${key}`] = `Field "${key}" is a secret and must be sent in "secrets", not "config"`
+				continue
+			}
+			const result = validateInputValue(field, value as any)
+			if (result.validationError) {
+				errors[`config.${key}`] = result.validationError
+			}
+		}
+	}
+
+	// Validate secrets keys against secret-text fields
+	if (secrets) {
+		for (const [key, value] of Object.entries(secrets)) {
+			const field = fieldMap.get(key)
+			if (!field) {
+				errors[`secrets.${key}`] = `Unknown secret field: "${key}"`
+				continue
+			}
+			if (field.type !== 'secret-text') {
+				errors[`secrets.${key}`] = `Field "${key}" is not a secret and must be sent in "config", not "secrets"`
+				continue
+			}
+			const result = validateInputValue(field, value as any)
+			if (result.validationError) {
+				errors[`secrets.${key}`] = result.validationError
+			}
+		}
+	}
+
+	return Object.keys(errors).length > 0 ? errors : null
 }
 
 const connectionIdParam = z.object({ connectionId: z.string() })
