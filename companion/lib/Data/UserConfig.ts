@@ -7,6 +7,7 @@ import LogController from '../Log/Controller.js'
 import type { DataStoreTableView } from './StoreBase.js'
 import { publicProcedure, router, toIterable } from '../UI/TRPC.js'
 import z from 'zod'
+import { isPackaged } from '../Resources/Util.js'
 
 export interface DataUserConfigEvents {
 	keyChanged: [key: keyof UserConfigModel, value: any, checkControlsInBounds: boolean]
@@ -58,7 +59,7 @@ export class DataUserConfig extends EventEmitter<DataUserConfigEvents> {
 		http_api_enabled: true,
 		http_legacy_api_enabled: false,
 
-		rest_api_enabled: true,
+		rest_api_enabled: !isPackaged(),
 
 		tcp_enabled: false,
 		tcp_listen_port: 16759,
