@@ -12,32 +12,24 @@ const STATIC_DEV_TOKENS: ApiToken[] = [
 		name: 'Dev Read Token',
 		token: 'cpn_read',
 		scopes: ['read'],
-		createdAt: 0,
-		lastUsedAt: null,
 	},
 	{
 		id: 'static-write',
 		name: 'Dev Write Token',
 		token: 'cpn_write',
 		scopes: ['read', 'write'],
-		createdAt: 0,
-		lastUsedAt: null,
 	},
 	{
 		id: 'static-execute',
 		name: 'Dev Execute Token',
 		token: 'cpn_execute',
 		scopes: ['read', 'execute'],
-		createdAt: 0,
-		lastUsedAt: null,
 	},
 	{
 		id: 'static-admin',
 		name: 'Dev Admin Token',
 		token: 'cpn_admin',
 		scopes: ['admin'],
-		createdAt: 0,
-		lastUsedAt: null,
 	},
 ]
 
@@ -72,8 +64,6 @@ export class RestApiTokenStoreMemory implements ApiTokenStore {
 			name,
 			token: plaintext,
 			scopes,
-			createdAt: Date.now(),
-			lastUsedAt: null,
 		}
 
 		this.#tokens.set(plaintext, token)
@@ -87,18 +77,6 @@ export class RestApiTokenStoreMemory implements ApiTokenStore {
 	 */
 	findByToken(plaintext: string): ApiToken | undefined {
 		return this.#tokens.get(plaintext)
-	}
-
-	/**
-	 * Update the lastUsedAt timestamp for a token.
-	 */
-	updateLastUsed(tokenId: string): void {
-		for (const token of this.#tokens.values()) {
-			if (token.id === tokenId) {
-				token.lastUsedAt = Date.now()
-				break
-			}
-		}
 	}
 
 	/**

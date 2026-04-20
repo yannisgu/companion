@@ -9,8 +9,6 @@ export interface ApiToken {
 	name: string
 	token: string
 	scopes: ApiTokenScope[]
-	createdAt: number
-	lastUsedAt: number | null
 }
 
 /** Maps HTTP method + route semantics to the required scope */
@@ -30,7 +28,6 @@ function hasScope(tokenScopes: ApiTokenScope[], required: RequiredScope): boolea
 
 export interface ApiTokenStore {
 	findByToken(plaintext: string): ApiToken | undefined
-	updateLastUsed(tokenId: string): void
 }
 
 /**
@@ -54,9 +51,6 @@ export function createAuthMiddleware(logger: Logger, tokenStore: ApiTokenStore) 
 
 		// Attach token to request for scope checks
 		;(req as any).apiToken = token
-
-		// Update last used (fire-and-forget)
-		tokenStore.updateLastUsed(token.id)
 
 		logger.debug(`API request authenticated: token="${token.name}" path=${req.path}`)
 		next()
