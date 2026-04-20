@@ -58,6 +58,19 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 			return
 		}
 
+		// Validate the specific version exists if provided
+		if (versionId) {
+			const versionInfo = instanceController.modules.getModuleManifest(
+				ModuleInstanceType.Connection,
+				module.type,
+				versionId
+			)
+			if (!versionInfo) {
+				next(RestApiError.badRequest(`Unknown version "${versionId}" for module "${module.type}"`))
+				return
+			}
+		}
+
 		try {
 			const [id] = instanceController.addConnectionWithLabel(module, label, {
 				versionId: versionId ?? null,

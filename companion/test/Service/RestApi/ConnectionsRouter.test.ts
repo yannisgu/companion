@@ -276,6 +276,7 @@ describe('REST API v1 — Connections', () => {
 			}
 
 			instanceController.modules.hasModule.mockReturnValue(true)
+			instanceController.modules.getModuleManifest.mockReturnValue({} as any)
 			instanceController.addConnectionWithLabel.mockReturnValue(['new-id', newConfig])
 			instanceController.getConnectionClientJson.mockReturnValue({
 				'new-id': {
@@ -349,6 +350,27 @@ describe('REST API v1 — Connections', () => {
 			expect(res.status).toBe(400)
 			expect(res.body.error.code).toBe('BAD_REQUEST')
 			expect(res.body.error.message).toContain('nonexistent')
+			expect(instanceController.addConnectionWithLabel).not.toHaveBeenCalled()
+		})
+
+		test('returns 400 for unknown version id', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.modules.hasModule.mockReturnValue(true)
+			instanceController.modules.getModuleManifest.mockReturnValue(undefined)
+
+			const res = await supertest(app)
+				.post('/api/connections/v1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({
+					module: { type: 'obs-websocket' },
+					label: 'test',
+					versionId: 'v99.0.0',
+				})
+
+			expect(res.status).toBe(400)
+			expect(res.body.error.code).toBe('BAD_REQUEST')
+			expect(res.body.error.message).toContain('v99.0.0')
 			expect(instanceController.addConnectionWithLabel).not.toHaveBeenCalled()
 		})
 
