@@ -126,16 +126,27 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 			return
 		}
 
-		const { label, enabled, config, updatePolicy } = parsed.data
+		const { label, enabled, config, secrets, updatePolicy } = parsed.data
 
-		const result = instanceController.setConnectionLabelAndConfig(connectionId, {
-			label: label ?? null,
-			enabled: enabled ?? null,
-			config: config ?? null,
-			secrets: null,
-			updatePolicy: updatePolicy ?? null,
-			upgradeIndex: null,
-		})
+		// Merge config with existing (partial update semantics)
+		let mergedConfig: unknown | null = null
+		if (config) {
+			const existing = instanceController.getInstanceConfigOfType(connectionId, ModuleInstanceType.Connection)
+			mergedConfig = { ...((existing?.config as Record<string, unknown>) ?? {}), ...config }
+		}
+
+		const result = instanceController.setConnectionLabelAndConfig(
+			connectionId,
+			{
+				label: label ?? null,
+				enabled: enabled ?? null,
+				config: mergedConfig,
+				secrets: secrets ?? null,
+				updatePolicy: updatePolicy ?? null,
+				upgradeIndex: null,
+			},
+			{ patchSecrets: true }
+		)
 
 		if (!result.ok) {
 			next(RestApiError.badRequest(result.message))

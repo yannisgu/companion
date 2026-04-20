@@ -34,11 +34,16 @@ export const ConnectionCreateBodySchema = z.object({
 	enabled: z.boolean().optional(),
 })
 
-/** Schema for partially updating a connection */
+/**
+ * Schema for partially updating a connection.
+ * Both `config` and `secrets` use merge semantics — only the keys you send are updated,
+ * existing keys are preserved.
+ */
 export const ConnectionPatchBodySchema = z.object({
 	label: z.string().optional(),
 	enabled: z.boolean().optional(),
 	config: z.record(z.string(), z.unknown()).optional(),
+	secrets: z.record(z.string(), z.unknown()).optional(),
 	updatePolicy: z.enum(InstanceVersionUpdatePolicy).optional(),
 	collectionId: z.string().nullable().optional(),
 })

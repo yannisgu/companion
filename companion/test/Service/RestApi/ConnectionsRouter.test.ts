@@ -415,14 +415,18 @@ describe('REST API v1 — Connections', () => {
 			expect(res.status).toBe(200)
 			expect(res.body.data.label).toBe('Renamed OBS')
 
-			expect(instanceController.setConnectionLabelAndConfig).toHaveBeenCalledWith('conn-1', {
-				label: 'Renamed OBS',
-				enabled: null,
-				config: null,
-				secrets: null,
-				updatePolicy: null,
-				upgradeIndex: null,
-			})
+			expect(instanceController.setConnectionLabelAndConfig).toHaveBeenCalledWith(
+				'conn-1',
+				{
+					label: 'Renamed OBS',
+					enabled: null,
+					config: null,
+					secrets: null,
+					updatePolicy: null,
+					upgradeIndex: null,
+				},
+				{ patchSecrets: true }
+			)
 		})
 
 		test('updates connection enabled state', async () => {
