@@ -6,7 +6,6 @@ import supertest from 'supertest'
 import { createRestApiRouter } from '../../../lib/Service/RestApi/RestApiRouter.js'
 import { RestApiTokenStoreMemory } from '../../../lib/Service/RestApi/RestApiTokenStore.js'
 import type { InstanceController } from '../../../lib/Instance/Controller.js'
-import type { DataUserConfig } from '../../../lib/Data/UserConfig.js'
 import type { ClientConnectionConfig } from '../../../../shared-lib/lib/Model/Connections.js'
 import {
 	ModuleInstanceType,
@@ -23,9 +22,6 @@ const mockOptions = {
 describe('REST API v1 — Connections', () => {
 	function createService() {
 		const instanceController = mockDeep<InstanceController>(mockOptions)
-		const userconfig = mockDeep<DataUserConfig>(mockOptions, {
-			getKey: () => true,
-		})
 
 		const tokenStore = new RestApiTokenStoreMemory()
 
@@ -33,16 +29,15 @@ describe('REST API v1 — Connections', () => {
 		const validToken = 'cpn_admin'
 		const readOnlyToken = 'cpn_read'
 
-		const restApiRouter = createRestApiRouter(instanceController, userconfig, tokenStore)
+		const restApiRouter = createRestApiRouter(instanceController, tokenStore)
 
 		const app = express()
 		app.use(Express.json())
-		app.use('/api/v1', restApiRouter)
+		app.use('/api', restApiRouter)
 
 		return {
 			app,
 			instanceController,
-			userconfig,
 			tokenStore,
 			validToken,
 			readOnlyToken,
@@ -84,7 +79,7 @@ describe('REST API v1 — Connections', () => {
 		test('returns 401 without Authorization header', async () => {
 			const { app } = createService()
 
-			const res = await supertest(app).get('/api/v1/connections').send()
+			const res = await supertest(app).get('/api/connections/v1').send()
 			expect(res.status).toBe(401)
 			expect(res.body.error.code).toBe('UNAUTHORIZED')
 		})
@@ -93,7 +88,7 @@ describe('REST API v1 — Connections', () => {
 			const { app } = createService()
 
 			const res = await supertest(app)
-				.get('/api/v1/connections')
+				.get('/api/connections/v1')
 				.set('Authorization', 'Bearer cpn_invalid_token')
 				.send()
 			expect(res.status).toBe(401)
@@ -103,7 +98,7 @@ describe('REST API v1 — Connections', () => {
 		test('returns 401 with malformed Authorization header', async () => {
 			const { app } = createService()
 
-			const res = await supertest(app).get('/api/v1/connections').set('Authorization', 'Basic abc123').send()
+			const res = await supertest(app).get('/api/connections/v1').set('Authorization', 'Basic abc123').send()
 			expect(res.status).toBe(401)
 		})
 	})
@@ -114,7 +109,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getConnectionClientJson.mockReturnValue({})
 
 			const res = await supertest(app)
-				.get('/api/v1/connections')
+				.get('/api/connections/v1')
 				.set('Authorization', `Bearer ${readOnlyToken}`)
 				.send()
 			expect(res.status).toBe(200)
@@ -124,7 +119,7 @@ describe('REST API v1 — Connections', () => {
 			const { app, readOnlyToken } = createService()
 
 			const res = await supertest(app)
-				.post('/api/v1/connections')
+				.post('/api/connections/v1')
 				.set('Authorization', `Bearer ${readOnlyToken}`)
 				.send({ module: { type: 'obs' }, label: 'test' })
 			expect(res.status).toBe(403)
@@ -135,33 +130,10 @@ describe('REST API v1 — Connections', () => {
 			const { app, readOnlyToken } = createService()
 
 			const res = await supertest(app)
-				.post('/api/v1/connections/conn-1/restart')
+				.post('/api/connections/v1/conn-1/restart')
 				.set('Authorization', `Bearer ${readOnlyToken}`)
 				.send()
 			expect(res.status).toBe(403)
-		})
-	})
-
-	describe('api disabled', () => {
-		test('returns 403 when rest_api_enabled is false', async () => {
-			// Create a service with REST API disabled
-			const instanceController = mockDeep<InstanceController>(mockOptions)
-			const userconfig = mockDeep<DataUserConfig>(mockOptions, {
-				getKey: () => false,
-			})
-
-			const tokenStore = new RestApiTokenStoreMemory()
-			const restApiRouter = createRestApiRouter(instanceController, userconfig, tokenStore)
-			const app = express()
-			app.use(Express.json())
-			app.use('/api/v1', restApiRouter)
-
-			const res = await supertest(app)
-				.get('/api/v1/connections')
-				.set('Authorization', 'Bearer cpn_admin')
-				.send()
-			expect(res.status).toBe(403)
-			expect(res.body.error.code).toBe('API_DISABLED')
 		})
 	})
 
@@ -176,7 +148,7 @@ describe('REST API v1 — Connections', () => {
 			})
 
 			const res = await supertest(app)
-				.get('/api/v1/connections')
+				.get('/api/connections/v1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -215,7 +187,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getConnectionClientJson.mockReturnValue({})
 
 			const res = await supertest(app)
-				.get('/api/v1/connections')
+				.get('/api/connections/v1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -231,7 +203,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getInstanceStatus.mockReturnValue(undefined)
 
 			const res = await supertest(app)
-				.get('/api/v1/connections')
+				.get('/api/connections/v1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -252,7 +224,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getInstanceStatus.mockReturnValue(mockStatus)
 
 			const res = await supertest(app)
-				.get('/api/v1/connections/conn-1')
+				.get('/api/connections/v1/conn-1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -276,7 +248,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 
 			const res = await supertest(app)
-				.get('/api/v1/connections/unknown-id')
+				.get('/api/connections/v1/unknown-id')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -321,7 +293,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getInstanceStatus.mockReturnValue(undefined)
 
 			const res = await supertest(app)
-				.post('/api/v1/connections')
+				.post('/api/connections/v1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send({
 					module: { type: 'obs-websocket' },
@@ -330,7 +302,7 @@ describe('REST API v1 — Connections', () => {
 				})
 
 			expect(res.status).toBe(201)
-			expect(res.headers.location).toBe('/api/v1/connections/new-id')
+			expect(res.headers.location).toBe('/api/connections/v1/new-id')
 			expect(res.body.data.id).toBe('new-id')
 			expect(res.body.data.label).toBe('New OBS')
 			expect(res.body.data.moduleId).toBe('obs-websocket')
@@ -352,7 +324,7 @@ describe('REST API v1 — Connections', () => {
 			const { app, validToken } = createService()
 
 			const res = await supertest(app)
-				.post('/api/v1/connections')
+				.post('/api/connections/v1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send({ invalid: true })
 
@@ -368,7 +340,7 @@ describe('REST API v1 — Connections', () => {
 			})
 
 			const res = await supertest(app)
-				.post('/api/v1/connections')
+				.post('/api/connections/v1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send({
 					module: { type: 'nonexistent' },
@@ -393,7 +365,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getInstanceStatus.mockReturnValue(mockStatus)
 
 			const res = await supertest(app)
-				.patch('/api/v1/connections/conn-1')
+				.patch('/api/connections/v1/conn-1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send({ label: 'Renamed OBS' })
 
@@ -422,7 +394,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getInstanceStatus.mockReturnValue(undefined)
 
 			const res = await supertest(app)
-				.patch('/api/v1/connections/conn-1')
+				.patch('/api/connections/v1/conn-1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send({ enabled: false })
 
@@ -436,7 +408,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 
 			const res = await supertest(app)
-				.patch('/api/v1/connections/unknown-id')
+				.patch('/api/connections/v1/unknown-id')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send({ label: 'test' })
 
@@ -450,7 +422,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.setConnectionLabelAndConfig.mockReturnValue({ ok: false, message: 'duplicate label' })
 
 			const res = await supertest(app)
-				.patch('/api/v1/connections/conn-1')
+				.patch('/api/connections/v1/conn-1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send({ label: 'duplicate' })
 
@@ -464,7 +436,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 
 			const res = await supertest(app)
-				.patch('/api/v1/connections/conn-1')
+				.patch('/api/connections/v1/conn-1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send({ enabled: 'not-a-boolean' })
 
@@ -481,7 +453,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.removeConnection.mockResolvedValue(undefined)
 
 			const res = await supertest(app)
-				.delete('/api/v1/connections/conn-1')
+				.delete('/api/connections/v1/conn-1')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -495,7 +467,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 
 			const res = await supertest(app)
-				.delete('/api/v1/connections/unknown-id')
+				.delete('/api/connections/v1/unknown-id')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -511,7 +483,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.restartConnection.mockReturnValue(true)
 
 			const res = await supertest(app)
-				.post('/api/v1/connections/conn-1/restart')
+				.post('/api/connections/v1/conn-1/restart')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -527,7 +499,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.restartConnection.mockReturnValue(false)
 
 			const res = await supertest(app)
-				.post('/api/v1/connections/conn-2/restart')
+				.post('/api/connections/v1/conn-2/restart')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -541,7 +513,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 
 			const res = await supertest(app)
-				.post('/api/v1/connections/unknown-id/restart')
+				.post('/api/connections/v1/unknown-id/restart')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
@@ -554,7 +526,7 @@ describe('REST API v1 — Connections', () => {
 			const { app, validToken } = createService()
 
 			const res = await supertest(app)
-				.get('/api/v1/nonexistent')
+				.get('/api/nonexistent')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 

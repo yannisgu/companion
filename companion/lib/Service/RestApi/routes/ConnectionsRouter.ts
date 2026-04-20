@@ -21,7 +21,7 @@ import { InstanceVersionUpdatePolicy } from '@companion-app/shared/Model/Instanc
 import type { Logger } from '../../../Log/Controller.js'
 
 /**
- * Create the connections router for /api/v1/connections
+ * Create the connections router for /api/connections/v1
  */
 export function createConnectionsRouter(logger: Logger, instanceController: InstanceController): Express.Router {
 	const router = Express.Router()
@@ -66,7 +66,7 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 			const response = buildConnectionResponse(id, config, status)
 
 			logger.info(`REST API: Created connection "${label}" (${id})`)
-			res.status(201).location(`/api/v1/connections/${id}`).json(successResponse(response))
+			res.status(201).location(`/api/connections/v1/${id}`).json(successResponse(response))
 		} catch (e: any) {
 			next(RestApiError.badRequest(e.message || 'Failed to create connection'))
 		}
@@ -192,7 +192,7 @@ const errorResponses = {
 export function registerConnectionPaths(): void {
 	registry.registerPath({
 		method: 'get',
-		path: '/connections',
+		path: '/connections/v1',
 		tags: ['Connections'],
 		summary: 'List all connections',
 		description: 'Returns all connections with their configuration and current status.',
@@ -208,7 +208,7 @@ export function registerConnectionPaths(): void {
 
 	registry.registerPath({
 		method: 'post',
-		path: '/connections',
+		path: '/connections/v1',
 		tags: ['Connections'],
 		summary: 'Create a connection',
 		description: 'Create a new connection instance for a given module type.',
@@ -227,7 +227,7 @@ export function registerConnectionPaths(): void {
 
 	registry.registerPath({
 		method: 'get',
-		path: '/connections/{connectionId}',
+		path: '/connections/v1/{connectionId}',
 		tags: ['Connections'],
 		summary: 'Get a connection',
 		description: 'Returns a single connection by ID with its configuration and current status.',
@@ -244,7 +244,7 @@ export function registerConnectionPaths(): void {
 
 	registry.registerPath({
 		method: 'patch',
-		path: '/connections/{connectionId}',
+		path: '/connections/v1/{connectionId}',
 		tags: ['Connections'],
 		summary: 'Update a connection',
 		description: 'Partially update a connection. Only send the fields you want to change.',
@@ -264,7 +264,7 @@ export function registerConnectionPaths(): void {
 
 	registry.registerPath({
 		method: 'delete',
-		path: '/connections/{connectionId}',
+		path: '/connections/v1/{connectionId}',
 		tags: ['Connections'],
 		summary: 'Delete a connection',
 		description: 'Delete a connection and all its associated configuration.',
@@ -278,7 +278,7 @@ export function registerConnectionPaths(): void {
 
 	registry.registerPath({
 		method: 'post',
-		path: '/connections/{connectionId}/restart',
+		path: '/connections/v1/{connectionId}/restart',
 		tags: ['Connections'],
 		summary: 'Restart a connection',
 		description: 'Force-restart the connection process. Fails if the connection is disabled.',

@@ -19,7 +19,7 @@ export function generateOpenApiDocument(): ReturnType<OpenApiGeneratorV3['genera
 			version: '1.0.0',
 			description: 'REST API for programmatic configuration management of Bitfocus Companion.',
 		},
-		servers: [{ url: '/api/v1', description: 'REST API v1' }],
+		servers: [{ url: '/api', description: 'REST API (resources versioned independently)' }],
 		security: [{ bearerAuth: [] }],
 	})
 }

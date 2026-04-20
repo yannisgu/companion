@@ -6,8 +6,12 @@ import { RestApiTokenStoreMemory } from './RestApiTokenStore.js'
 import LogController from '../../Log/Controller.js'
 
 /**
- * Service class that sets up and mounts the REST API v1.
- * Creates the token store, router, and mounts on the Express app at /api/v1/.
+ * Service class that sets up and mounts the REST API.
+ * Creates the token store, router, and mounts on the Express app at /api/.
+ * Each resource type is versioned independently (e.g. /api/connections/v1/).
+ *
+ * The REST API is only mounted when `rest_api_enabled` is true at startup.
+ * Changing the setting requires a restart of Companion.
  */
 export class RestApiService {
 	readonly #logger = LogController.createLogger('Service/RestApi')
@@ -16,12 +20,17 @@ export class RestApiService {
 	constructor(instanceController: InstanceController, userconfigController: DataUserConfig, express: UIExpress) {
 		this.tokenStore = new RestApiTokenStoreMemory()
 
-		const restApiV1Router = createRestApiRouter(instanceController, userconfigController, this.tokenStore)
+		if (!userconfigController.getKey('rest_api_enabled')) {
+			this.#logger.info('REST API is disabled (set rest_api_enabled and restart to enable)')
+			return
+		}
 
-		// Mount the REST API v1 router via the setter on UIExpress
-		// This is registered at /api/v1 before the existing /api routes
-		express.restApiV1Router = restApiV1Router
+		const restApiRouter = createRestApiRouter(instanceController, this.tokenStore)
 
-		this.#logger.info('REST API v1 mounted at /api/v1/')
+		// Mount the REST API router via the setter on UIExpress
+		// This is registered at /api before the existing /api legacy routes
+		express.restApiRouter = restApiRouter
+
+		this.#logger.info('REST API mounted at /api/ (resources versioned independently)')
 	}
 }

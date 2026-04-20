@@ -5,34 +5,18 @@ import { restApiErrorHandler } from './middleware/errorHandler.js'
 import { createConnectionsRouter } from './routes/ConnectionsRouter.js'
 import { generateOpenApiDocument } from './openapi.js'
 import type { InstanceController } from '../../Instance/Controller.js'
-import type { DataUserConfig } from '../../Data/UserConfig.js'
 import LogController from '../../Log/Controller.js'
 
 /**
- * Create the main REST API v1 router.
- * Mounted at /api/v1/ on the admin Express app.
+ * Create the main REST API router.
+ * Mounted at /api/ on the admin Express app.
+ * Each resource type is versioned independently: /api/connections/v1/, /api/pages/v1/, etc.
+ *
+ * Only created when the REST API is enabled at startup (checked in RestApiService).
  */
-export function createRestApiRouter(
-	instanceController: InstanceController,
-	userconfigController: DataUserConfig,
-	tokenStore: ApiTokenStore
-): Express.Router {
+export function createRestApiRouter(instanceController: InstanceController, tokenStore: ApiTokenStore): Express.Router {
 	const logger = LogController.createLogger('Service/RestApi')
 	const router = Express.Router()
-
-	// Check if REST API is enabled
-	router.use((_req, res, next) => {
-		if (userconfigController.getKey('rest_api_enabled')) {
-			next()
-		} else {
-			res.status(403).json({
-				error: {
-					code: 'API_DISABLED',
-					message: 'REST API is disabled',
-				},
-			})
-		}
-	})
 
 	// OpenAPI spec and Swagger UI — served without auth
 	const openApiDocument = generateOpenApiDocument()
@@ -46,10 +30,10 @@ export function createRestApiRouter(
 	// Bearer token authentication (all routes below require a token)
 	router.use(createAuthMiddleware(logger, tokenStore))
 
-	// Mount sub-routers
-	router.use('/connections', createConnectionsRouter(logger, instanceController))
+	// Mount resource routers — each versioned independently
+	router.use('/connections/v1', createConnectionsRouter(logger, instanceController))
 
-	// 404 handler for unmatched routes under /api/v1
+	// 404 handler for unmatched routes under /api
 	router.use((_req, res) => {
 		res.status(404).json({
 			error: {

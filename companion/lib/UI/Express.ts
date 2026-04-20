@@ -59,7 +59,7 @@ function createServeStatic(
 export class UIExpress {
 	readonly app = Express()
 	#apiRouter = Express.Router()
-	#restApiV1Router = Express.Router()
+	#restApiRouter = Express.Router()
 	#legacyApiRouter = Express.Router()
 	#connectionApiRouter = Express.Router()
 
@@ -96,8 +96,8 @@ export class UIExpress {
 			res.redirect(301, `/instance${req.url}`)
 		})
 
-		// Use the router #restApiV1Router for the new REST API v1, mounted before the legacy /api routes
-		this.app.use('/api/v1', async (r, s, n) => this.#restApiV1Router(r, s, n))
+		// Use the router #restApiRouter for the new REST API, mounted before the legacy /api routes
+		this.app.use('/api', async (r, s, n) => this.#restApiRouter(r, s, n))
 
 		// Use the router #apiRouter to add API routes dynamically, this router can be redefined at runtime with setter
 		this.app.use('/api', async (r, s, n) => this.#apiRouter(r, s, n))
@@ -148,10 +148,10 @@ export class UIExpress {
 	}
 
 	/**
-	 * Set a new router as the REST API v1 router
+	 * Set a new router as the REST API router
 	 */
-	set restApiV1Router(router: Express.Router) {
-		this.#restApiV1Router = router
+	set restApiRouter(router: Express.Router) {
+		this.#restApiRouter = router
 	}
 
 	/**

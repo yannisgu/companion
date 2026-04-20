@@ -7,7 +7,6 @@ import { generateOpenApiDocument } from '../../../lib/Service/RestApi/openapi.js
 import { createRestApiRouter } from '../../../lib/Service/RestApi/RestApiRouter.js'
 import { RestApiTokenStoreMemory } from '../../../lib/Service/RestApi/RestApiTokenStore.js'
 import type { InstanceController } from '../../../lib/Instance/Controller.js'
-import type { DataUserConfig } from '../../../lib/Data/UserConfig.js'
 
 const mockOptions = {
 	fallbackMockImplementation: () => {
@@ -30,7 +29,7 @@ describe('OpenAPI Spec Generation', () => {
 
 	test('includes server definition', () => {
 		expect(doc.servers).toBeDefined()
-		expect(doc.servers).toEqual(expect.arrayContaining([expect.objectContaining({ url: '/api/v1' })]))
+		expect(doc.servers).toEqual(expect.arrayContaining([expect.objectContaining({ url: '/api' })]))
 	})
 
 	test('defines bearerAuth security scheme', () => {
@@ -50,9 +49,9 @@ describe('OpenAPI Spec Generation', () => {
 
 	describe('connection paths', () => {
 		const expectedPaths = [
-			'/connections',
-			'/connections/{connectionId}',
-			'/connections/{connectionId}/restart',
+			'/connections/v1',
+			'/connections/v1/{connectionId}',
+			'/connections/v1/{connectionId}/restart',
 		]
 
 		test('registers all expected paths', () => {
@@ -62,7 +61,7 @@ describe('OpenAPI Spec Generation', () => {
 		})
 
 		test('GET /connections is defined with correct response schema', () => {
-			const op = doc.paths?.['/connections']?.get
+			const op = doc.paths?.['/connections/v1']?.get
 			expect(op).toBeDefined()
 			expect(op!.tags).toContain('Connections')
 			expect(op!.responses['200']).toBeDefined()
@@ -73,7 +72,7 @@ describe('OpenAPI Spec Generation', () => {
 		})
 
 		test('POST /connections is defined with request body', () => {
-			const op = doc.paths?.['/connections']?.post
+			const op = doc.paths?.['/connections/v1']?.post
 			expect(op).toBeDefined()
 			expect(op!.tags).toContain('Connections')
 			expect(op!.requestBody).toBeDefined()
@@ -81,26 +80,26 @@ describe('OpenAPI Spec Generation', () => {
 		})
 
 		test('GET /connections/{connectionId} is defined', () => {
-			const op = doc.paths?.['/connections/{connectionId}']?.get
+			const op = doc.paths?.['/connections/v1/{connectionId}']?.get
 			expect(op).toBeDefined()
 			expect(op!.responses['200']).toBeDefined()
 		})
 
 		test('PATCH /connections/{connectionId} is defined with request body', () => {
-			const op = doc.paths?.['/connections/{connectionId}']?.patch
+			const op = doc.paths?.['/connections/v1/{connectionId}']?.patch
 			expect(op).toBeDefined()
 			expect(op!.requestBody).toBeDefined()
 			expect(op!.responses['200']).toBeDefined()
 		})
 
 		test('DELETE /connections/{connectionId} is defined', () => {
-			const op = doc.paths?.['/connections/{connectionId}']?.delete
+			const op = doc.paths?.['/connections/v1/{connectionId}']?.delete
 			expect(op).toBeDefined()
 			expect(op!.responses['204']).toBeDefined()
 		})
 
 		test('POST /connections/{connectionId}/restart is defined', () => {
-			const op = doc.paths?.['/connections/{connectionId}/restart']?.post
+			const op = doc.paths?.['/connections/v1/{connectionId}/restart']?.post
 			expect(op).toBeDefined()
 			expect(op!.responses['200']).toBeDefined()
 			expect(op!.responses['409']).toBeDefined()
@@ -124,7 +123,7 @@ describe('OpenAPI Spec Generation', () => {
 
 	describe('schema definitions', () => {
 		test('ConnectionResponse schema has expected properties', () => {
-			const listOp = doc.paths?.['/connections']?.get
+			const listOp = doc.paths?.['/connections/v1']?.get
 			const schema200 = (listOp?.responses['200'] as any)?.content?.['application/json']?.schema
 			expect(schema200).toBeDefined()
 
@@ -145,7 +144,7 @@ describe('OpenAPI Spec Generation', () => {
 		})
 
 		test('ConnectionCreateBody schema has expected properties', () => {
-			const postOp = doc.paths?.['/connections']?.post
+			const postOp = doc.paths?.['/connections/v1']?.post
 			const bodySchema = (postOp?.requestBody as any)?.content?.['application/json']?.schema
 			expect(bodySchema).toBeDefined()
 
@@ -158,7 +157,7 @@ describe('OpenAPI Spec Generation', () => {
 		})
 
 		test('ConnectionPatchBody schema has expected optional properties', () => {
-			const patchOp = doc.paths?.['/connections/{connectionId}']?.patch
+			const patchOp = doc.paths?.['/connections/v1/{connectionId}']?.patch
 			const bodySchema = (patchOp?.requestBody as any)?.content?.['application/json']?.schema
 			expect(bodySchema).toBeDefined()
 
@@ -171,7 +170,7 @@ describe('OpenAPI Spec Generation', () => {
 		})
 
 		test('PaginationMeta schema has total, limit, offset', () => {
-			const listOp = doc.paths?.['/connections']?.get
+			const listOp = doc.paths?.['/connections/v1']?.get
 			const schema200 = (listOp?.responses['200'] as any)?.content?.['application/json']?.schema
 			const metaSchema = schema200?.properties?.meta
 			expect(metaSchema).toBeDefined()
@@ -181,7 +180,7 @@ describe('OpenAPI Spec Generation', () => {
 		})
 
 		test('ErrorResponse schema has error.code and error.message', () => {
-			const getOp = doc.paths?.['/connections']?.get
+			const getOp = doc.paths?.['/connections/v1']?.get
 			const schema401 = (getOp?.responses['401'] as any)?.content?.['application/json']?.schema
 			expect(schema401).toBeDefined()
 			expect(schema401.properties?.error).toBeDefined()
@@ -194,15 +193,12 @@ describe('OpenAPI Spec Generation', () => {
 describe('OpenAPI HTTP endpoints', () => {
 	function createService() {
 		const instanceController = mockDeep<InstanceController>(mockOptions)
-		const userconfig = mockDeep<DataUserConfig>(mockOptions, {
-			getKey: () => true,
-		})
 		const tokenStore = new RestApiTokenStoreMemory()
-		const restApiRouter = createRestApiRouter(instanceController, userconfig, tokenStore)
+		const restApiRouter = createRestApiRouter(instanceController, tokenStore)
 
 		const app = express()
 		app.use(Express.json())
-		app.use('/api/v1', restApiRouter)
+		app.use('/api', restApiRouter)
 
 		return { app }
 	}
@@ -210,39 +206,22 @@ describe('OpenAPI HTTP endpoints', () => {
 	test('GET /openapi.json returns the OpenAPI document without auth', async () => {
 		const { app } = createService()
 
-		const res = await supertest(app).get('/api/v1/openapi.json').send()
+		const res = await supertest(app).get('/api/openapi.json').send()
 
 		expect(res.status).toBe(200)
 		expect(res.body.openapi).toBe('3.0.3')
 		expect(res.body.info.title).toBe('Bitfocus Companion REST API')
 		expect(res.body.paths).toBeDefined()
-		expect(res.body.paths['/connections']).toBeDefined()
+		expect(res.body.paths['/connections/v1']).toBeDefined()
 	})
 
 	test('GET /docs returns Swagger UI HTML without auth', async () => {
 		const { app } = createService()
 
-		const res = await supertest(app).get('/api/v1/docs/').send()
+		const res = await supertest(app).get('/api/docs/').send()
 
 		expect(res.status).toBe(200)
 		expect(res.headers['content-type']).toMatch(/text\/html/)
 		expect(res.text).toContain('swagger')
-	})
-
-	test('GET /openapi.json returns 403 when API is disabled', async () => {
-		const instanceController = mockDeep<InstanceController>(mockOptions)
-		const userconfig = mockDeep<DataUserConfig>(mockOptions, {
-			getKey: () => false,
-		})
-		const tokenStore = new RestApiTokenStoreMemory()
-		const restApiRouter = createRestApiRouter(instanceController, userconfig, tokenStore)
-
-		const app = express()
-		app.use(Express.json())
-		app.use('/api/v1', restApiRouter)
-
-		const res = await supertest(app).get('/api/v1/openapi.json').send()
-		expect(res.status).toBe(403)
-		expect(res.body.error.code).toBe('API_DISABLED')
 	})
 })
