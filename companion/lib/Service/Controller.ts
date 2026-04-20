@@ -13,6 +13,7 @@ import { ServiceUdp } from './Udp.js'
 import type { UIHandler } from '../UI/Handler.js'
 import { ServiceSatelliteWebsocket } from './SatelliteWebsocket.js'
 import { ServiceSatelliteApi } from './Satellite/SatelliteApi.js'
+import { RestApiService } from './RestApi/RestApiService.js'
 import type { ServiceApi } from './ServiceApi.js'
 import type { DataUserConfig } from '../Data/UserConfig.js'
 import type { ControlLocation } from '@companion-app/shared/Model/Common.js'
@@ -39,6 +40,7 @@ import type { UIExpress } from '../UI/Express.js'
  */
 export class ServiceController {
 	readonly httpApi: ServiceHttpApi
+	readonly restApi: RestApiService
 	readonly https: ServiceHttps
 	readonly oscSender: ServiceOscSender
 	readonly oscListener: ServiceOscListener
@@ -64,6 +66,7 @@ export class ServiceController {
 		express: UIExpress
 	) {
 		this.httpApi = new ServiceHttpApi(serviceApi, userconfig, express)
+		this.restApi = new RestApiService(instanceController, userconfig, express)
 		this.https = new ServiceHttps(userconfig, express, io)
 		this.oscSender = oscSender
 		this.oscListener = new ServiceOscListener(serviceApi, userconfig)

@@ -58,6 +58,8 @@ export class DataUserConfig extends EventEmitter<DataUserConfigEvents> {
 		http_api_enabled: true,
 		http_legacy_api_enabled: false,
 
+		rest_api_enabled: true,
+
 		tcp_enabled: false,
 		tcp_listen_port: 16759,
 		tcp_legacy_api_enabled: false,
