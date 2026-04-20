@@ -639,6 +639,105 @@ describe('REST API v1 — Connections', () => {
 		})
 	})
 
+	describe('GET /connections/:connectionId/config-fields', () => {
+		test('returns config field definitions for a running connection', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
+
+			const mockInstance = {
+				requestConfigFields: async () => [
+					{ id: 'host', type: 'textinput' as const, label: 'Host', default: 'localhost', placeholder: 'IP or hostname' },
+					{ id: 'port', type: 'number' as const, label: 'Port', default: 4455, min: 1, max: 65535, step: 1 },
+					{
+						id: 'protocol',
+						type: 'dropdown' as const,
+						label: 'Protocol',
+						default: 'ws',
+						choices: [
+							{ id: 'ws', label: 'WebSocket' },
+							{ id: 'wss', label: 'WebSocket Secure' },
+						],
+					},
+					{ id: 'password', type: 'secret-text' as const, label: 'Password' },
+					{ id: 'info', type: 'static-text' as const, label: 'Info', value: 'Some info text' },
+				],
+			}
+			instanceController.processManager.getConnectionChild.mockReturnValue(mockInstance as any)
+
+			const res = await supertest(app)
+				.get('/api/connections/v1/conn-1/config-fields')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send()
+
+			expect(res.status).toBe(200)
+			// static-text fields are filtered out
+			expect(res.body.data).toHaveLength(4)
+
+			expect(res.body.data[0]).toEqual({
+				id: 'host',
+				type: 'textinput',
+				label: 'Host',
+				default: 'localhost',
+				placeholder: 'IP or hostname',
+			})
+
+			expect(res.body.data[1]).toEqual({
+				id: 'port',
+				type: 'number',
+				label: 'Port',
+				default: 4455,
+				min: 1,
+				max: 65535,
+				step: 1,
+			})
+
+			expect(res.body.data[2]).toEqual({
+				id: 'protocol',
+				type: 'dropdown',
+				label: 'Protocol',
+				default: 'ws',
+				choices: [
+					{ id: 'ws', label: 'WebSocket' },
+					{ id: 'wss', label: 'WebSocket Secure' },
+				],
+			})
+
+			expect(res.body.data[3]).toEqual({
+				id: 'password',
+				type: 'secret-text',
+				label: 'Password',
+			})
+		})
+
+		test('returns 409 when connection is not running', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
+			instanceController.processManager.getConnectionChild.mockReturnValue(null as any)
+
+			const res = await supertest(app)
+				.get('/api/connections/v1/conn-1/config-fields')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send()
+
+			expect(res.status).toBe(409)
+		})
+
+		test('returns 404 for unknown connection', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
+
+			const res = await supertest(app)
+				.get('/api/connections/v1/unknown-id/config-fields')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send()
+
+			expect(res.status).toBe(404)
+		})
+	})
+
 	describe('DELETE /connections/:connectionId', () => {
 		test('deletes a connection', async () => {
 			const { app, instanceController, validToken } = createService()

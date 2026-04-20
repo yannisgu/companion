@@ -13,6 +13,7 @@ import {
 	ConnectionResponseSchema,
 	ConnectionCreateBodySchema,
 	ConnectionPatchBodySchema,
+	ConfigFieldResponseSchema,
 	buildConnectionResponse,
 } from '../schemas/connections.js'
 import { registry } from '../registry.js'
@@ -168,6 +169,37 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	})
 
 	/**
+	 * GET /connections/:connectionId/config-fields — Get module config field definitions
+	 */
+	router.get('/:connectionId/config-fields', requireScope('read'), async (req, res, next) => {
+		const { connectionId } = req.params
+
+		const clientConnections = instanceController.getConnectionClientJson(true)
+		if (!clientConnections[connectionId]) {
+			next(RestApiError.notFound('Connection not found'))
+			return
+		}
+
+		const instance = instanceController.processManager.getConnectionChild(connectionId)
+		if (!instance) {
+			next(RestApiError.conflict('Connection is not running'))
+			return
+		}
+
+		let fields: SomeCompanionInputField[]
+		try {
+			fields = await instance.requestConfigFields()
+		} catch {
+			next(RestApiError.conflict('Failed to retrieve config fields from module'))
+			return
+		}
+
+		const configFields = fields.filter((f) => f.type !== 'static-text').map((field) => buildConfigFieldResponse(field))
+
+		res.json(successResponse(configFields))
+	})
+
+	/**
 	 * DELETE /connections/:connectionId — Delete a connection
 	 */
 	router.delete('/:connectionId', requireScope('write'), async (req, res, next) => {
@@ -208,6 +240,70 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	})
 
 	return router
+}
+
+/**
+ * Build an API-friendly representation of a config field definition.
+ */
+function buildConfigFieldResponse(field: SomeCompanionInputField): Record<string, unknown> {
+	const base: Record<string, unknown> = {
+		id: field.id,
+		type: field.type,
+		label: field.label,
+	}
+
+	if (field.tooltip) base.tooltip = field.tooltip
+	if (field.description) base.description = field.description
+
+	switch (field.type) {
+		case 'textinput':
+			if (field.default !== undefined) base.default = field.default
+			if (field.minLength !== undefined) base.minLength = field.minLength
+			if (field.regex) base.regex = field.regex
+			if (field.placeholder) base.placeholder = field.placeholder
+			if (field.multiline) base.multiline = field.multiline
+			break
+		case 'secret-text':
+			if (field.default !== undefined) base.default = field.default
+			if (field.minLength !== undefined) base.minLength = field.minLength
+			if (field.regex) base.regex = field.regex
+			break
+		case 'number':
+			base.default = field.default
+			base.min = field.min
+			base.max = field.max
+			if (field.step !== undefined) base.step = field.step
+			if (field.range) base.range = field.range
+			break
+		case 'checkbox':
+			base.default = field.default
+			break
+		case 'dropdown':
+			base.default = field.default
+			base.choices = field.choices
+			if (field.allowCustom) base.allowCustom = field.allowCustom
+			if (field.regex) base.regex = field.regex
+			break
+		case 'multidropdown':
+			base.default = field.default
+			base.choices = field.choices
+			if (field.minSelection !== undefined) base.minSelection = field.minSelection
+			if (field.maxSelection !== undefined) base.maxSelection = field.maxSelection
+			if (field.allowCustom) base.allowCustom = field.allowCustom
+			if (field.regex) base.regex = field.regex
+			break
+		case 'colorpicker':
+			base.default = field.default
+			if (field.enableAlpha) base.enableAlpha = field.enableAlpha
+			if (field.returnType) base.returnType = field.returnType
+			break
+		case 'bonjour-device':
+		case 'custom-variable':
+		case 'expression':
+			break
+	}
+
+	return base
 }
 
 /**
@@ -344,6 +440,28 @@ export function registerConnectionPaths(): void {
 			200: {
 				description: 'Connection details',
 				content: { 'application/json': { schema: createSuccessSchema(ConnectionResponseSchema) } },
+			},
+			...errorResponses,
+		},
+	})
+
+	registry.registerPath({
+		method: 'get',
+		path: '/connections/v1/{connectionId}/config-fields',
+		tags: ['Connections'],
+		summary: 'Get connection config field definitions',
+		description:
+			'Returns the config field definitions for a connection module, including field types, constraints, and available options. The connection must be running.',
+		security: [{ bearerAuth: [] }],
+		request: { params: connectionIdParam },
+		responses: {
+			200: {
+				description: 'Config field definitions',
+				content: { 'application/json': { schema: createSuccessSchema(z.array(ConfigFieldResponseSchema)) } },
+			},
+			409: {
+				description: 'Connection is not running',
+				content: { 'application/json': { schema: ErrorResponseSchema } },
 			},
 			...errorResponses,
 		},

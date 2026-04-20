@@ -48,6 +48,36 @@ export const ConnectionPatchBodySchema = z.object({
 	collectionId: z.string().nullable().optional(),
 })
 
+/** Schema for a dropdown choice */
+const DropdownChoiceSchema = z.object({
+	id: z.union([z.string(), z.number()]),
+	label: z.string(),
+})
+
+/** Schema for a config field definition in API responses */
+export const ConfigFieldResponseSchema = z.object({
+	id: z.string(),
+	type: z.string(),
+	label: z.string(),
+	tooltip: z.string().optional(),
+	description: z.string().optional(),
+	default: z.unknown().optional(),
+	min: z.number().optional(),
+	max: z.number().optional(),
+	step: z.number().optional(),
+	range: z.boolean().optional(),
+	minLength: z.number().optional(),
+	regex: z.string().optional(),
+	placeholder: z.string().optional(),
+	multiline: z.boolean().optional(),
+	choices: z.array(DropdownChoiceSchema).optional(),
+	allowCustom: z.boolean().optional(),
+	minSelection: z.number().optional(),
+	maxSelection: z.number().optional(),
+	enableAlpha: z.boolean().optional(),
+	returnType: z.string().optional(),
+})
+
 export type ConnectionResponse = z.infer<typeof ConnectionResponseSchema>
 export type ConnectionCreateBody = z.infer<typeof ConnectionCreateBodySchema>
 export type ConnectionPatchBody = z.infer<typeof ConnectionPatchBodySchema>
