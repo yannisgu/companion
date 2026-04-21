@@ -133,9 +133,13 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 
 		// Validate config/secrets values against module field definitions
 		if (config || secrets) {
-			const validationErrors = await validateConfigAndSecrets(instanceController, connectionId, config, secrets)
-			if (validationErrors) {
-				next(RestApiError.badRequest('Config validation failed', validationErrors))
+			const validationResult = await validateConfigAndSecrets(instanceController, connectionId, config, secrets)
+			if (validationResult.status === 'unavailable') {
+				next(RestApiError.conflict(validationResult.message))
+				return
+			}
+			if (validationResult.status === 'invalid') {
+				next(RestApiError.badRequest('Config validation failed', validationResult.errors))
 				return
 			}
 		}
@@ -306,28 +310,31 @@ function buildConfigFieldResponse(field: SomeCompanionInputField): Record<string
 	return base
 }
 
+type ValidationResult =
+	| { status: 'ok' }
+	| { status: 'unavailable'; message: string }
+	| { status: 'invalid'; errors: Record<string, string> }
+
 /**
  * Validate config and secrets values against the module's field definitions.
- * Returns an object with field errors if validation fails, or null if valid.
+ * Returns validation result: ok, unavailable (connection not running), or invalid (field errors).
  */
 async function validateConfigAndSecrets(
 	instanceController: InstanceController,
 	connectionId: string,
 	config: Record<string, unknown> | undefined,
 	secrets: Record<string, unknown> | undefined
-): Promise<Record<string, string> | null> {
+): Promise<ValidationResult> {
 	const instance = instanceController.processManager.getConnectionChild(connectionId)
 	if (!instance) {
-		// Connection not running, skip field-level validation
-		return null
+		return { status: 'unavailable', message: 'Connection is not running, cannot validate config' }
 	}
 
 	let fields: SomeCompanionInputField[]
 	try {
 		fields = await instance.requestConfigFields()
 	} catch {
-		// Cannot retrieve fields (e.g. module crashed), skip validation
-		return null
+		return { status: 'unavailable', message: 'Failed to retrieve config fields from module' }
 	}
 
 	const errors: Record<string, string> = {}
@@ -376,7 +383,7 @@ async function validateConfigAndSecrets(
 		}
 	}
 
-	return Object.keys(errors).length > 0 ? errors : null
+	return Object.keys(errors).length > 0 ? { status: 'invalid', errors } : { status: 'ok' }
 }
 
 const connectionIdParam = z.object({ connectionId: z.string() })

@@ -619,21 +619,37 @@ describe('REST API v1 — Connections', () => {
 			)
 		})
 
-		test('skips validation when connection is not running', async () => {
+		test('returns 409 when patching config but connection is not running', async () => {
 			const { app, instanceController, validToken } = createService()
 
 			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
 			instanceController.processManager.getConnectionChild.mockReturnValue(null as any)
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({ config: { anything: 'goes' } })
+
+			expect(res.status).toBe(409)
+			expect(res.body.error.code).toBe('CONFLICT')
+			expect(instanceController.setConnectionLabelAndConfig).not.toHaveBeenCalled()
+		})
+
+		test('allows non-config patches when connection is not running', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
 			instanceController.setConnectionLabelAndConfig.mockReturnValue({ ok: true })
 
 			const updatedConfigs = createConnectionConfigs()
+			updatedConfigs['conn-1'].label = 'New Label'
 			instanceController.getConnectionClientJson.mockReturnValueOnce(updatedConfigs)
 			instanceController.getInstanceStatus.mockReturnValue(mockStatus)
 
 			const res = await supertest(app)
 				.patch('/api/connections/v1/conn-1')
 				.set('Authorization', `Bearer ${validToken}`)
-				.send({ config: { anything: 'goes' } })
+				.send({ label: 'New Label', enabled: false })
 
 			expect(res.status).toBe(200)
 		})
