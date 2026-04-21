@@ -170,16 +170,14 @@ describe('REST API v1 — Connections', () => {
 	})
 
 	describe('GET /connections', () => {
-		test('returns paginated list of connections with config', async () => {
+		test('returns paginated list of connections without config by default', async () => {
 			const { app, instanceController, validToken } = createService()
 
-			const instanceConfigs = createInstanceConfigs()
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 			instanceController.getInstanceStatus.mockImplementation((id: string) => {
 				if (id === 'conn-1') return mockStatus
 				return undefined
 			})
-			instanceController.getInstanceConfigOfType.mockImplementation((id: string) => instanceConfigs[id])
 
 			const res = await supertest(app)
 				.get('/api/connections/v1')
@@ -200,27 +198,14 @@ describe('REST API v1 — Connections', () => {
 				sortOrder: 0,
 				collectionId: null,
 				status: mockStatus,
-				config: { host: 'localhost', port: 4455 },
 			})
 
-			// Secrets not included by default
+			// Config and secrets not included by default
+			expect(res.body.data[0]).not.toHaveProperty('config')
 			expect(res.body.data[0]).not.toHaveProperty('secrets')
-
-			expect(res.body.data[1]).toEqual({
-				id: 'conn-2',
-				label: 'My ATEM',
-				moduleId: 'bmd-atem',
-				moduleVersionId: 'v1.2.0',
-				updatePolicy: 'manual',
-				enabled: false,
-				sortOrder: 1,
-				collectionId: 'group-a',
-				status: null,
-				config: { ip: '192.168.1.100' },
-			})
 		})
 
-		test('includes secrets when include_secrets=true', async () => {
+		test('includes config when include_config=true', async () => {
 			const { app, instanceController, validToken } = createService()
 
 			const instanceConfigs = createInstanceConfigs()
@@ -229,11 +214,30 @@ describe('REST API v1 — Connections', () => {
 			instanceController.getInstanceConfigOfType.mockImplementation((id: string) => instanceConfigs[id])
 
 			const res = await supertest(app)
-				.get('/api/connections/v1?include_secrets=true')
+				.get('/api/connections/v1?include_config=true')
 				.set('Authorization', `Bearer ${validToken}`)
 				.send()
 
 			expect(res.status).toBe(200)
+			expect(res.body.data[0].config).toEqual({ host: 'localhost', port: 4455 })
+			expect(res.body.data[0]).not.toHaveProperty('secrets')
+		})
+
+		test('includes secrets when include_config=true&include_secrets=true', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			const instanceConfigs = createInstanceConfigs()
+			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
+			instanceController.getInstanceStatus.mockReturnValue(undefined)
+			instanceController.getInstanceConfigOfType.mockImplementation((id: string) => instanceConfigs[id])
+
+			const res = await supertest(app)
+				.get('/api/connections/v1?include_config=true&include_secrets=true')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send()
+
+			expect(res.status).toBe(200)
+			expect(res.body.data[0].config).toEqual({ host: 'localhost', port: 4455 })
 			expect(res.body.data[0].secrets).toEqual({ password: 'secret123' })
 		})
 
@@ -255,10 +259,8 @@ describe('REST API v1 — Connections', () => {
 		test('strips extra fields from response via Zod (e.g. hasRecordActionsHandler)', async () => {
 			const { app, instanceController, validToken } = createService()
 
-			const instanceConfigs = createInstanceConfigs()
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 			instanceController.getInstanceStatus.mockReturnValue(undefined)
-			instanceController.getInstanceConfigOfType.mockImplementation((id: string) => instanceConfigs[id])
 
 			const res = await supertest(app)
 				.get('/api/connections/v1')

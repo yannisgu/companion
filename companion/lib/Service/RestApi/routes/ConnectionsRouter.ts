@@ -33,12 +33,15 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	 * GET /connections — List all connections with config + status
 	 */
 	router.get('/', requireScope('read'), (req, res) => {
+		const includeConfig = req.query.include_config === 'true'
 		const includeSecrets = req.query.include_secrets === 'true'
 		const clientConnections = instanceController.getConnectionClientJson(true)
 
 		const connections = Object.entries(clientConnections).map(([id, config]) => {
 			const status = instanceController.getInstanceStatus(id)
-			const instanceConfig = instanceController.getInstanceConfigOfType(id, ModuleInstanceType.Connection)
+			const instanceConfig = includeConfig
+				? instanceController.getInstanceConfigOfType(id, ModuleInstanceType.Connection)
+				: undefined
 			return buildConnectionResponse(id, config, status, instanceConfig, includeSecrets)
 		})
 
