@@ -54,7 +54,7 @@ export interface ConnectionChildHandlerApi extends ChildProcessHandlerBase {
 	/**
 	 * Fetch the config fields from the instance to show in the ui
 	 */
-	requestConfigFields(): Promise<SomeCompanionInputField[]>
+	requestConfigFields(signal?: AbortSignal): Promise<SomeCompanionInputField[]>
 
 	/**
 	 * Send all feedback instances to the child process

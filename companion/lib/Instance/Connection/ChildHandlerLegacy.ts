@@ -270,9 +270,9 @@ export class ConnectionChildHandlerLegacy implements ChildProcessHandlerBase, Co
 	/**
 	 * Fetch the config fields from the instance to show in the ui
 	 */
-	async requestConfigFields(): Promise<SomeCompanionInputField[]> {
+	async requestConfigFields(signal?: AbortSignal): Promise<SomeCompanionInputField[]> {
 		try {
-			const res = await this.#ipcWrapper.sendWithCb('getConfigFields', {})
+			const res = await this.#ipcWrapper.sendWithCb('getConfigFields', {}, undefined, 0, signal)
 			return translateConnectionConfigFields(res.fields)
 		} catch (e) {
 			this.logger.warn('Error getting config fields: ' + stringifyError(e))
