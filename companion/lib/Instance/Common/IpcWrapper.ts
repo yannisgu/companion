@@ -65,8 +65,7 @@ export class IpcWrapper<TOutbound extends { [key: string]: any }, TInbound exten
 		name: T,
 		msg: ParamsIfReturnIsValid<TOutbound[T]>[0],
 		defaultResponse?: () => Error,
-		timeout = 0,
-		signal?: AbortSignal
+		timeout = 0
 	): Promise<ReturnType<TOutbound[T]>> {
 		if (timeout <= 0) timeout = this.#defaultTimeout
 
@@ -92,26 +91,6 @@ export class IpcWrapper<TOutbound extends { [key: string]: any }, TInbound exten
 			callbacks.reject(defaultResponse ? defaultResponse() : timeoutError)
 			this.#pendingCallbacks.delete(id)
 		}, timeout)
-
-		// If an AbortSignal is provided, reject on abort
-		if (signal) {
-			if (signal.aborted) {
-				clearTimeout(callbacks.timeout)
-				this.#pendingCallbacks.delete(id)
-				callbacks.reject(new Error(signal.reason?.message ?? 'Aborted'))
-			} else {
-				signal.addEventListener(
-					'abort',
-					() => {
-						if (this.#pendingCallbacks.delete(id)) {
-							clearTimeout(callbacks.timeout)
-							callbacks.reject(new Error(signal.reason?.message ?? 'Aborted'))
-						}
-					},
-					{ once: true }
-				)
-			}
-		}
 
 		return promise.promise
 	}
