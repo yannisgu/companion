@@ -37,17 +37,7 @@ export function createRestApiRouter(instanceController: InstanceController, toke
 	// Mount resource routers — each versioned independently
 	router.use('/connections/v1', createConnectionsRouter(logger, instanceController))
 
-	// 404 handler for unmatched routes under /api
-	router.use((_req, res) => {
-		res.status(404).json({
-			error: {
-				code: 'NOT_FOUND',
-				message: 'Endpoint not found',
-			},
-		})
-	})
-
-	// Global error handler
+	// Global error handler (unmatched routes fall through to the legacy /api router)
 	router.use(restApiErrorHandler)
 
 	return router

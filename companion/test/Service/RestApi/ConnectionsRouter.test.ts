@@ -901,17 +901,4 @@ describe('REST API v1 — Connections', () => {
 		})
 	})
 
-	describe('unknown endpoint', () => {
-		test('returns 404 for unmatched routes', async () => {
-			const { app, validToken } = createService()
-
-			const res = await supertest(app)
-				.get('/api/nonexistent')
-				.set('Authorization', `Bearer ${validToken}`)
-				.send()
-
-			expect(res.status).toBe(404)
-			expect(res.body.error.code).toBe('NOT_FOUND')
-		})
-	})
 })
