@@ -17,14 +17,14 @@ export const ErrorResponseSchema = z.object({
 })
 
 /** Create a typed single-item success envelope schema for OpenAPI docs */
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function createSuccessSchema<T extends z.ZodType>(itemSchema: T) {
+export function createSuccessSchema<T extends z.ZodType>(itemSchema: T): z.ZodObject<{ data: T }> {
 	return z.object({ data: itemSchema })
 }
 
 /** Create a typed collection envelope schema for OpenAPI docs */
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function createCollectionSchema<T extends z.ZodType>(itemSchema: T) {
+export function createCollectionSchema<T extends z.ZodType>(
+	itemSchema: T
+): z.ZodObject<{ data: z.ZodArray<T>; meta: typeof PaginationMetaSchema }> {
 	return z.object({
 		data: z.array(itemSchema),
 		meta: PaginationMetaSchema,
