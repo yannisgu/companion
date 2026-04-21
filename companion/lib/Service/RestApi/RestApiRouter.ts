@@ -25,7 +25,11 @@ export function createRestApiRouter(instanceController: InstanceController, toke
 		res.json(openApiDocument)
 	})
 
-	router.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument))
+	router.use(
+		'/docs',
+		swaggerUi.serve,
+		swaggerUi.setup(openApiDocument, { swaggerOptions: { persistAuthorization: true } })
+	)
 
 	// Bearer token authentication (all routes below require a token)
 	router.use(createAuthMiddleware(logger, tokenStore))
