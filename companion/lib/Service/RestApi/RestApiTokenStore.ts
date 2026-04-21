@@ -26,6 +26,12 @@ const STATIC_DEV_TOKENS: ApiToken[] = [
 		scopes: ['read', 'execute'],
 	},
 	{
+		id: 'static-secrets',
+		name: 'Dev Secrets Token',
+		token: 'cpn_secrets',
+		scopes: ['read', 'write', 'secrets'],
+	},
+	{
 		id: 'static-admin',
 		name: 'Dev Admin Token',
 		token: 'cpn_admin',

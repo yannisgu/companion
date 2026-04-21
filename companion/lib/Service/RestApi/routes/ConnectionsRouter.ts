@@ -1,6 +1,6 @@
 import Express from 'express'
 import z from 'zod'
-import { requireScope } from '../RestApiAuth.js'
+import { requireScope, hasScope, type ApiToken } from '../RestApiAuth.js'
 import { RestApiError } from '../errors.js'
 import {
 	successResponse,
@@ -32,9 +32,15 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	/**
 	 * GET /connections — List all connections with config + status
 	 */
-	router.get('/', requireScope('read'), (req, res) => {
+	router.get('/', requireScope('read'), (req, res, next) => {
+		const token = (req as any).apiToken as ApiToken
 		const includeConfig = req.query.include_config === 'true'
 		const includeSecrets = req.query.include_secrets === 'true'
+
+		if (includeSecrets && !hasScope(token.scopes, 'secrets')) {
+			next(RestApiError.forbidden("Insufficient scope: requires 'secrets'"))
+			return
+		}
 		const clientConnections = instanceController.getConnectionClientJson(true)
 
 		const connections = Object.entries(clientConnections).map(([id, config]) => {
@@ -104,8 +110,14 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	 * GET /connections/:connectionId — Get one connection (config + status)
 	 */
 	router.get('/:connectionId', requireScope('read'), (req, res, next) => {
+		const token = (req as any).apiToken as ApiToken
 		const { connectionId } = req.params
 		const includeSecrets = req.query.include_secrets === 'true'
+
+		if (includeSecrets && !hasScope(token.scopes, 'secrets')) {
+			next(RestApiError.forbidden("Insufficient scope: requires 'secrets'"))
+			return
+		}
 		const clientConnections = instanceController.getConnectionClientJson(true)
 		const config = clientConnections[connectionId]
 
@@ -138,6 +150,15 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 		}
 
 		const { label, enabled, config, secrets, updatePolicy } = parsed.data
+
+		// Require 'secrets' scope to update secrets
+		if (secrets) {
+			const token = (req as any).apiToken as ApiToken
+			if (!hasScope(token.scopes, 'secrets')) {
+				next(RestApiError.forbidden("Insufficient scope: requires 'secrets'"))
+				return
+			}
+		}
 
 		// Validate config/secrets values against module field definitions
 		if (config || secrets) {

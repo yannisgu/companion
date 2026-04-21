@@ -2,7 +2,7 @@ import type Express from 'express'
 import { RestApiError } from './errors.js'
 import type { Logger } from '../../Log/Controller.js'
 
-export type ApiTokenScope = 'read' | 'write' | 'execute' | 'admin'
+export type ApiTokenScope = 'read' | 'write' | 'execute' | 'secrets' | 'admin'
 
 export interface ApiToken {
 	id: string
@@ -12,13 +12,13 @@ export interface ApiToken {
 }
 
 /** Maps HTTP method + route semantics to the required scope */
-export type RequiredScope = 'read' | 'write' | 'execute' | 'admin'
+export type RequiredScope = 'read' | 'write' | 'execute' | 'secrets' | 'admin'
 
 /**
  * Check if a token's scopes satisfy the required scope.
  * admin implies all scopes. write and execute each imply read.
  */
-function hasScope(tokenScopes: ApiTokenScope[], required: RequiredScope): boolean {
+export function hasScope(tokenScopes: ApiTokenScope[], required: RequiredScope): boolean {
 	if (tokenScopes.includes('admin')) return true
 	if (required === 'read') {
 		return tokenScopes.includes('read') || tokenScopes.includes('write') || tokenScopes.includes('execute')

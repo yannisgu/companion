@@ -28,6 +28,8 @@ describe('REST API v1 — Connections', () => {
 		// Use the static dev tokens for testing
 		const validToken = 'cpn_admin'
 		const readOnlyToken = 'cpn_read'
+		const writeToken = 'cpn_write'
+		const secretsToken = 'cpn_secrets'
 
 		const restApiRouter = createRestApiRouter(instanceController, tokenStore)
 
@@ -41,6 +43,8 @@ describe('REST API v1 — Connections', () => {
 			tokenStore,
 			validToken,
 			readOnlyToken,
+			writeToken,
+			secretsToken,
 		}
 	}
 
@@ -166,6 +170,56 @@ describe('REST API v1 — Connections', () => {
 				.set('Authorization', `Bearer ${readOnlyToken}`)
 				.send()
 			expect(res.status).toBe(403)
+		})
+
+		test('write token gets 403 when patching secrets', async () => {
+			const { app, instanceController, writeToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${writeToken}`)
+				.send({ secrets: { password: 'new' } })
+			expect(res.status).toBe(403)
+			expect(res.body.error.code).toBe('FORBIDDEN')
+		})
+
+		test('write token gets 403 when requesting include_secrets', async () => {
+			const { app, instanceController, writeToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
+
+			const res = await supertest(app)
+				.get('/api/connections/v1?include_config=true&include_secrets=true')
+				.set('Authorization', `Bearer ${writeToken}`)
+				.send()
+			expect(res.status).toBe(403)
+		})
+
+		test('secrets token can patch secrets', async () => {
+			const { app, instanceController, secretsToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
+
+			const mockInstance = {
+				requestConfigFields: async () => [
+					{ id: 'password', type: 'secret-text' as const, label: 'Password' },
+				],
+			}
+			instanceController.processManager.getConnectionChild.mockReturnValue(mockInstance as any)
+			instanceController.setConnectionLabelAndConfig.mockReturnValue({ ok: true })
+
+			const updatedConfigs = createConnectionConfigs()
+			instanceController.getConnectionClientJson.mockReturnValueOnce(updatedConfigs)
+			instanceController.getInstanceStatus.mockReturnValue(undefined)
+			instanceController.getInstanceConfigOfType.mockReturnValue(createInstanceConfigs()['conn-1'])
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${secretsToken}`)
+				.send({ secrets: { password: 'new' } })
+			expect(res.status).toBe(200)
 		})
 	})
 
