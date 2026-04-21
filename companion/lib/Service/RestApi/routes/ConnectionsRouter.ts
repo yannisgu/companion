@@ -170,13 +170,12 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 			return
 		}
 
-		// Re-fetch updated data
-		const includeSecrets = req.query.include_secrets === 'true'
+		// Re-fetch updated data — only echo back secrets if they were part of the update
 		const updatedConnections = instanceController.getConnectionClientJson(false)
 		const updatedConfig = updatedConnections[connectionId]
 		const status = instanceController.getInstanceStatus(connectionId)
 		const instanceConfig = instanceController.getInstanceConfigOfType(connectionId, ModuleInstanceType.Connection)
-		const response = buildConnectionResponse(connectionId, updatedConfig, status, instanceConfig, includeSecrets)
+		const response = buildConnectionResponse(connectionId, updatedConfig, status, instanceConfig, !!secrets)
 
 		logger.info(`REST API: Updated connection "${response.label}" (${connectionId})`)
 		res.json(successResponse(response))

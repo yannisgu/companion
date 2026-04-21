@@ -482,6 +482,8 @@ describe('REST API v1 — Connections', () => {
 
 			expect(res.status).toBe(200)
 			expect(res.body.data.label).toBe('Renamed OBS')
+			// Secrets not echoed back when not part of the update
+			expect(res.body.data).not.toHaveProperty('secrets')
 
 			expect(instanceController.setConnectionLabelAndConfig).toHaveBeenCalledWith(
 				'conn-1',
@@ -675,6 +677,8 @@ describe('REST API v1 — Connections', () => {
 				.send({ config: { host: 'localhost', port: 4455 }, secrets: { password: 'abc' } })
 
 			expect(res.status).toBe(200)
+			// Secrets echoed back because they were part of the update
+			expect(res.body.data.secrets).toEqual({ password: 'secret123' })
 			expect(instanceController.setConnectionLabelAndConfig).toHaveBeenCalledWith(
 				'conn-1',
 				{
