@@ -747,6 +747,45 @@ describe('REST API v1 — Connections', () => {
 			)
 		})
 
+		test('clears a config field by sending null (reset to default)', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			instanceController.getConnectionClientJson.mockReturnValueOnce(createConnectionConfigs())
+
+			const mockInstance = {
+				requestConfigFields: async () => [
+					{ id: 'host', type: 'textinput' as const, label: 'Host', default: 'localhost' },
+					{ id: 'port', type: 'number' as const, label: 'Port', default: 4455, min: 1, max: 65535 },
+				],
+			}
+			instanceController.processManager.getConnectionChild.mockReturnValue(mockInstance as any)
+			instanceController.setConnectionLabelAndConfig.mockReturnValue({ ok: true })
+
+			const updatedConfigs = createConnectionConfigs()
+			instanceController.getConnectionClientJson.mockReturnValueOnce(updatedConfigs)
+			instanceController.getInstanceStatus.mockReturnValue(undefined)
+			instanceController.getInstanceConfigOfType.mockReturnValue(createInstanceConfigs()['conn-1'])
+
+			const res = await supertest(app)
+				.patch('/api/connections/v1/conn-1')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send({ config: { host: null } })
+
+			expect(res.status).toBe(200)
+			expect(instanceController.setConnectionLabelAndConfig).toHaveBeenCalledWith(
+				'conn-1',
+				{
+					label: null,
+					enabled: null,
+					config: { host: null },
+					secrets: null,
+					updatePolicy: null,
+					upgradeIndex: null,
+				},
+				{ patchConfig: true, patchSecrets: true }
+			)
+		})
+
 		test('returns 409 when patching config but connection is not running', async () => {
 			const { app, instanceController, validToken } = createService()
 
