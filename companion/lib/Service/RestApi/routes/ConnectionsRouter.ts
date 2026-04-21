@@ -32,12 +32,14 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	/**
 	 * GET /connections — List all connections with config + status
 	 */
-	router.get('/', requireScope('read'), (_req, res) => {
+	router.get('/', requireScope('read'), (req, res) => {
+		const includeSecrets = req.query.include_secrets === 'true'
 		const clientConnections = instanceController.getConnectionClientJson(true)
 
 		const connections = Object.entries(clientConnections).map(([id, config]) => {
 			const status = instanceController.getInstanceStatus(id)
-			return buildConnectionResponse(id, config, status)
+			const instanceConfig = instanceController.getInstanceConfigOfType(id, ModuleInstanceType.Connection)
+			return buildConnectionResponse(id, config, status, instanceConfig, includeSecrets)
 		})
 
 		res.json(collectionResponse(connections, { total: connections.length, limit: connections.length, offset: 0 }))
@@ -85,7 +87,8 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 			const clientConnections = instanceController.getConnectionClientJson(false)
 			const config = clientConnections[id]
 			const status = instanceController.getInstanceStatus(id)
-			const response = buildConnectionResponse(id, config, status)
+			const instanceConfig = instanceController.getInstanceConfigOfType(id, ModuleInstanceType.Connection)
+			const response = buildConnectionResponse(id, config, status, instanceConfig)
 
 			logger.info(`REST API: Created connection "${label}" (${id})`)
 			res.status(201).location(`/api/connections/v1/${id}`).json(successResponse(response))
@@ -99,6 +102,7 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 	 */
 	router.get('/:connectionId', requireScope('read'), (req, res, next) => {
 		const { connectionId } = req.params
+		const includeSecrets = req.query.include_secrets === 'true'
 		const clientConnections = instanceController.getConnectionClientJson(true)
 		const config = clientConnections[connectionId]
 
@@ -108,7 +112,8 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 		}
 
 		const status = instanceController.getInstanceStatus(connectionId)
-		res.json(successResponse(buildConnectionResponse(connectionId, config, status)))
+		const instanceConfig = instanceController.getInstanceConfigOfType(connectionId, ModuleInstanceType.Connection)
+		res.json(successResponse(buildConnectionResponse(connectionId, config, status, instanceConfig, includeSecrets)))
 	})
 
 	/**
@@ -163,10 +168,12 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 		}
 
 		// Re-fetch updated data
+		const includeSecrets = req.query.include_secrets === 'true'
 		const updatedConnections = instanceController.getConnectionClientJson(false)
 		const updatedConfig = updatedConnections[connectionId]
 		const status = instanceController.getInstanceStatus(connectionId)
-		const response = buildConnectionResponse(connectionId, updatedConfig, status)
+		const instanceConfig = instanceController.getInstanceConfigOfType(connectionId, ModuleInstanceType.Connection)
+		const response = buildConnectionResponse(connectionId, updatedConfig, status, instanceConfig, includeSecrets)
 
 		logger.info(`REST API: Updated connection "${response.label}" (${connectionId})`)
 		res.json(successResponse(response))

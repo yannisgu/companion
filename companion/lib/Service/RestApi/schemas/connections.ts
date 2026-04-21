@@ -1,5 +1,5 @@
 import z from 'zod'
-import { InstanceVersionUpdatePolicy } from '@companion-app/shared/Model/Instance.js'
+import { InstanceVersionUpdatePolicy, type InstanceConfig } from '@companion-app/shared/Model/Instance.js'
 import type { ClientConnectionConfig } from '@companion-app/shared/Model/Connections.js'
 import type { InstanceStatusEntry } from '@companion-app/shared/Model/InstanceStatus.js'
 
@@ -21,6 +21,8 @@ export const ConnectionResponseSchema = z.object({
 	sortOrder: z.number(),
 	collectionId: z.string().nullable(),
 	status: ConnectionStatusSchema.nullable(),
+	config: z.record(z.string(), z.unknown()).optional(),
+	secrets: z.record(z.string(), z.unknown()).optional(),
 })
 
 /** Schema for creating a new connection */
@@ -88,18 +90,29 @@ export type ConnectionPatchBody = z.infer<typeof ConnectionPatchBodySchema>
  */
 export function buildConnectionResponse(
 	id: string,
-	config: ClientConnectionConfig,
-	status: InstanceStatusEntry | undefined
+	clientConfig: ClientConnectionConfig,
+	status: InstanceStatusEntry | undefined,
+	instanceConfig?: InstanceConfig,
+	includeSecrets?: boolean
 ): ConnectionResponse {
-	return ConnectionResponseSchema.parse({
+	const response: Record<string, unknown> = {
 		id,
-		label: config.label,
-		moduleId: config.moduleId,
-		moduleVersionId: config.moduleVersionId,
-		updatePolicy: config.updatePolicy,
-		enabled: config.enabled,
-		sortOrder: config.sortOrder,
-		collectionId: config.collectionId,
+		label: clientConfig.label,
+		moduleId: clientConfig.moduleId,
+		moduleVersionId: clientConfig.moduleVersionId,
+		updatePolicy: clientConfig.updatePolicy,
+		enabled: clientConfig.enabled,
+		sortOrder: clientConfig.sortOrder,
+		collectionId: clientConfig.collectionId,
 		status: status ?? null,
-	})
+	}
+
+	if (instanceConfig) {
+		response.config = (instanceConfig.config as Record<string, unknown>) ?? {}
+		if (includeSecrets) {
+			response.secrets = (instanceConfig.secrets as Record<string, unknown>) ?? {}
+		}
+	}
+
+	return ConnectionResponseSchema.parse(response)
 }

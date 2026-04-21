@@ -73,6 +73,38 @@ describe('REST API v1 — Connections', () => {
 		}
 	}
 
+	function createInstanceConfigs(): Record<string, InstanceConfig> {
+		return {
+			'conn-1': {
+				moduleInstanceType: ModuleInstanceType.Connection,
+				moduleId: 'obs-websocket',
+				moduleVersionId: null,
+				label: 'My OBS',
+				config: { host: 'localhost', port: 4455 },
+				secrets: { password: 'secret123' },
+				isFirstInit: false,
+				lastUpgradeIndex: 0,
+				enabled: true,
+				sortOrder: 0,
+				updatePolicy: InstanceVersionUpdatePolicy.Stable,
+			},
+			'conn-2': {
+				moduleInstanceType: ModuleInstanceType.Connection,
+				moduleId: 'bmd-atem',
+				moduleVersionId: 'v1.2.0',
+				label: 'My ATEM',
+				config: { ip: '192.168.1.100' },
+				secrets: undefined,
+				isFirstInit: false,
+				lastUpgradeIndex: 0,
+				enabled: false,
+				sortOrder: 1,
+				updatePolicy: InstanceVersionUpdatePolicy.Manual,
+				collectionId: 'group-a',
+			},
+		}
+	}
+
 	const mockStatus = { category: 'good', level: 'ok', message: 'Connected' }
 
 	describe('authentication', () => {
@@ -138,14 +170,16 @@ describe('REST API v1 — Connections', () => {
 	})
 
 	describe('GET /connections', () => {
-		test('returns paginated list of connections', async () => {
+		test('returns paginated list of connections with config', async () => {
 			const { app, instanceController, validToken } = createService()
 
+			const instanceConfigs = createInstanceConfigs()
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 			instanceController.getInstanceStatus.mockImplementation((id: string) => {
 				if (id === 'conn-1') return mockStatus
 				return undefined
 			})
+			instanceController.getInstanceConfigOfType.mockImplementation((id: string) => instanceConfigs[id])
 
 			const res = await supertest(app)
 				.get('/api/connections/v1')
@@ -166,7 +200,11 @@ describe('REST API v1 — Connections', () => {
 				sortOrder: 0,
 				collectionId: null,
 				status: mockStatus,
+				config: { host: 'localhost', port: 4455 },
 			})
+
+			// Secrets not included by default
+			expect(res.body.data[0]).not.toHaveProperty('secrets')
 
 			expect(res.body.data[1]).toEqual({
 				id: 'conn-2',
@@ -178,7 +216,25 @@ describe('REST API v1 — Connections', () => {
 				sortOrder: 1,
 				collectionId: 'group-a',
 				status: null,
+				config: { ip: '192.168.1.100' },
 			})
+		})
+
+		test('includes secrets when include_secrets=true', async () => {
+			const { app, instanceController, validToken } = createService()
+
+			const instanceConfigs = createInstanceConfigs()
+			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
+			instanceController.getInstanceStatus.mockReturnValue(undefined)
+			instanceController.getInstanceConfigOfType.mockImplementation((id: string) => instanceConfigs[id])
+
+			const res = await supertest(app)
+				.get('/api/connections/v1?include_secrets=true')
+				.set('Authorization', `Bearer ${validToken}`)
+				.send()
+
+			expect(res.status).toBe(200)
+			expect(res.body.data[0].secrets).toEqual({ password: 'secret123' })
 		})
 
 		test('returns empty array when no connections', async () => {
@@ -199,8 +255,10 @@ describe('REST API v1 — Connections', () => {
 		test('strips extra fields from response via Zod (e.g. hasRecordActionsHandler)', async () => {
 			const { app, instanceController, validToken } = createService()
 
+			const instanceConfigs = createInstanceConfigs()
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 			instanceController.getInstanceStatus.mockReturnValue(undefined)
+			instanceController.getInstanceConfigOfType.mockImplementation((id: string) => instanceConfigs[id])
 
 			const res = await supertest(app)
 				.get('/api/connections/v1')
@@ -217,11 +275,13 @@ describe('REST API v1 — Connections', () => {
 	})
 
 	describe('GET /connections/:connectionId', () => {
-		test('returns a single connection', async () => {
+		test('returns a single connection with config', async () => {
 			const { app, instanceController, validToken } = createService()
 
+			const instanceConfigs = createInstanceConfigs()
 			instanceController.getConnectionClientJson.mockReturnValue(createConnectionConfigs())
 			instanceController.getInstanceStatus.mockReturnValue(mockStatus)
+			instanceController.getInstanceConfigOfType.mockReturnValue(instanceConfigs['conn-1'])
 
 			const res = await supertest(app)
 				.get('/api/connections/v1/conn-1')
@@ -239,7 +299,10 @@ describe('REST API v1 — Connections', () => {
 				sortOrder: 0,
 				collectionId: null,
 				status: mockStatus,
+				config: { host: 'localhost', port: 4455 },
 			})
+			// Secrets not included by default
+			expect(res.body.data).not.toHaveProperty('secrets')
 		})
 
 		test('returns 404 for unknown connection', async () => {
@@ -278,6 +341,7 @@ describe('REST API v1 — Connections', () => {
 			instanceController.modules.hasModule.mockReturnValue(true)
 			instanceController.modules.getModuleManifest.mockReturnValue({} as any)
 			instanceController.addConnectionWithLabel.mockReturnValue(['new-id', newConfig])
+			instanceController.getInstanceConfigOfType.mockReturnValue(newConfig)
 			instanceController.getConnectionClientJson.mockReturnValue({
 				'new-id': {
 					id: 'new-id',
@@ -308,6 +372,7 @@ describe('REST API v1 — Connections', () => {
 			expect(res.body.data.id).toBe('new-id')
 			expect(res.body.data.label).toBe('New OBS')
 			expect(res.body.data.moduleId).toBe('obs-websocket')
+			expect(res.body.data.config).toEqual({})
 			expect(res.body.data).not.toHaveProperty('hasRecordActionsHandler')
 
 			expect(instanceController.addConnectionWithLabel).toHaveBeenCalledTimes(1)
@@ -406,6 +471,7 @@ describe('REST API v1 — Connections', () => {
 			updatedConfigs['conn-1'].label = 'Renamed OBS'
 			instanceController.getConnectionClientJson.mockReturnValueOnce(updatedConfigs)
 			instanceController.getInstanceStatus.mockReturnValue(mockStatus)
+			instanceController.getInstanceConfigOfType.mockReturnValue(createInstanceConfigs()['conn-1'])
 
 			const res = await supertest(app)
 				.patch('/api/connections/v1/conn-1')
@@ -439,6 +505,7 @@ describe('REST API v1 — Connections', () => {
 			updatedConfigs['conn-1'].enabled = false
 			instanceController.getConnectionClientJson.mockReturnValueOnce(updatedConfigs)
 			instanceController.getInstanceStatus.mockReturnValue(undefined)
+			instanceController.getInstanceConfigOfType.mockReturnValue(createInstanceConfigs()['conn-1'])
 
 			const res = await supertest(app)
 				.patch('/api/connections/v1/conn-1')
@@ -598,6 +665,7 @@ describe('REST API v1 — Connections', () => {
 			const updatedConfigs = createConnectionConfigs()
 			instanceController.getConnectionClientJson.mockReturnValueOnce(updatedConfigs)
 			instanceController.getInstanceStatus.mockReturnValue(mockStatus)
+			instanceController.getInstanceConfigOfType.mockReturnValue(createInstanceConfigs()['conn-1'])
 
 			const res = await supertest(app)
 				.patch('/api/connections/v1/conn-1')
@@ -645,6 +713,7 @@ describe('REST API v1 — Connections', () => {
 			updatedConfigs['conn-1'].label = 'New Label'
 			instanceController.getConnectionClientJson.mockReturnValueOnce(updatedConfigs)
 			instanceController.getInstanceStatus.mockReturnValue(mockStatus)
+			instanceController.getInstanceConfigOfType.mockReturnValue(createInstanceConfigs()['conn-1'])
 
 			const res = await supertest(app)
 				.patch('/api/connections/v1/conn-1')
