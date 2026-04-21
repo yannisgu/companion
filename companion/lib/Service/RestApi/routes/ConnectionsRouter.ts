@@ -415,8 +415,18 @@ export function registerConnectionPaths(): void {
 		path: '/connections/v1',
 		tags: ['Connections'],
 		summary: 'List all connections',
-		description: 'Returns all connections with their configuration and current status.',
+		description:
+			'Returns all connections with their current status. Use query parameters to include config and secrets.',
 		security: [{ bearerAuth: [] }],
+		request: {
+			query: z.object({
+				include_config: z.enum(['true', 'false']).optional().describe('Include connection config in response'),
+				include_secrets: z
+					.enum(['true', 'false'])
+					.optional()
+					.describe('Include connection secrets in response (requires include_config=true)'),
+			}),
+		},
 		responses: {
 			200: {
 				description: 'List of connections',
@@ -452,7 +462,12 @@ export function registerConnectionPaths(): void {
 		summary: 'Get a connection',
 		description: 'Returns a single connection by ID with its configuration and current status.',
 		security: [{ bearerAuth: [] }],
-		request: { params: connectionIdParam },
+		request: {
+			params: connectionIdParam,
+			query: z.object({
+				include_secrets: z.enum(['true', 'false']).optional().describe('Include connection secrets in response'),
+			}),
+		},
 		responses: {
 			200: {
 				description: 'Connection details',
