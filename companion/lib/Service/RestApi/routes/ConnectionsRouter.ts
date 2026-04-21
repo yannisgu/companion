@@ -23,9 +23,6 @@ import type { Logger } from '../../../Log/Controller.js'
 import { validateInputValue } from '@companion-app/shared/ValidateInputValue.js'
 import type { SomeCompanionInputField } from '@companion-app/shared/Model/Options.js'
 
-/** Timeout for IPC calls to module processes (e.g. requestConfigFields) */
-const IPC_TIMEOUT_MS = 5000
-
 /**
  * Create the connections router for /api/connections/v1
  */
@@ -195,7 +192,7 @@ export function createConnectionsRouter(logger: Logger, instanceController: Inst
 
 		let fields: SomeCompanionInputField[]
 		try {
-			fields = await instance.requestConfigFields(AbortSignal.timeout(IPC_TIMEOUT_MS))
+			fields = await instance.requestConfigFields()
 		} catch {
 			next(RestApiError.conflict('Failed to retrieve config fields from module'))
 			return
@@ -335,7 +332,7 @@ async function validateConfigAndSecrets(
 
 	let fields: SomeCompanionInputField[]
 	try {
-		fields = await instance.requestConfigFields(AbortSignal.timeout(IPC_TIMEOUT_MS))
+		fields = await instance.requestConfigFields()
 	} catch {
 		return { status: 'unavailable', message: 'Failed to retrieve config fields from module' }
 	}
