@@ -27,7 +27,13 @@ import type { SomeCompanionInputField } from '@companion-app/shared/Model/Option
 const IPC_TIMEOUT_MS = 5000
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-	return Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))])
+	const signal = AbortSignal.timeout(ms)
+	return Promise.race([
+		promise,
+		new Promise<never>((_, reject) => {
+			signal.addEventListener('abort', () => reject(new Error('IPC call timed out')), { once: true })
+		}),
+	])
 }
 
 /**
